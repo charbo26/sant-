@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WHOOP">
+<meta name="theme-color" content="#f5f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0e" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<title>WHOOP</title>
+<style>
+:root{--bg:#f5f5f3;--card:#fff;--fg:#141414;--muted:#888883;--line:#ebebe7;--soft:#f0f0ec;--hover:#fafaf8;
+--green:#1fa463;--yellow:#cf9a00;--red:#e04a3f;--blue:#3a7bdc;--violet:#7a62d6;--teal:#159a94;--amber:#e08a1e;
+--z1:#a9cdf7;--z2:#5fa3ef;--z3:#f0c04c;--z4:#ef8b3b;--z5:#e04a3f;--shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03)}
+@media (prefers-color-scheme:dark){:root{--bg:#0d0d0e;--card:#17171a;--fg:#f1f1ef;--muted:#8b8b86;--line:#27272a;
+--soft:#222226;--hover:#1c1c20;--shadow:none}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit;text-decoration:none}
+svg{shape-rendering:geometricPrecision;overflow:visible}
+svg text{font-family:inherit}
+.wrap{max-width:920px;margin:0 auto;padding:max(22px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.syncb{border:1px solid var(--line);background:var(--card);color:var(--fg);width:32px;height:32px;border-radius:50%;
+font-size:16px;cursor:pointer;display:grid;place-items:center}
+.syncb.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.sheet{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translate(-50%,140%);width:min(440px,calc(100% - 32px));
+background:var(--fg);color:var(--bg);border-radius:16px;padding:14px 16px;font-size:13px;z-index:20;transition:transform .35s cubic-bezier(.2,.8,.2,1);
+box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.sheet.show{transform:translate(-50%,0)}.sheet b{display:block;font-size:14px;margin-bottom:4px}.sheet .l{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:420px){.brand .bt{display:none}}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;min-height:36px;
+position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;margin-top:-10px}
+.brand{font-weight:700;letter-spacing:.2em;font-size:13px;display:flex;align-items:center;gap:10px}
+.back{border:1px solid var(--line);background:var(--card);width:32px;height:32px;border-radius:50%;display:grid;
+place-items:center;font-size:16px}
+.tabs{display:flex;gap:3px;background:var(--soft);padding:3px;border-radius:999px}
+.tabs a{color:var(--muted);font-size:13px;padding:6px 13px;border-radius:999px;transition:background .2s,color .2s}
+.tabs a.on{background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+main{animation:fade .35s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.datebar{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px}
+.datebar a,.datebar span.dis{border:1px solid var(--line);background:var(--card);width:34px;height:34px;
+border-radius:50%;display:grid;place-items:center;font-size:17px;transition:background .2s}
+.datebar a:hover{background:var(--hover)}.datebar span.dis{opacity:.3}
+.datebar h1{font-size:17px;font-weight:600;min-width:210px;text-align:center}
+.title{text-align:center;margin-bottom:20px}.title h1{font-size:22px;font-weight:650}
+.title p{color:var(--muted);font-size:13px;margin-top:2px}
+.rings{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+.ring{background:var(--card);border-radius:20px;padding:20px 8px 16px;text-align:center;box-shadow:var(--shadow);
+transition:background .2s}
+a.ring:hover,a.tile:hover,a.row:hover,a.card:hover{background:var(--hover)}
+.ring svg{width:100%;height:auto;display:block;margin:0 auto 10px}
+.arc{transition:stroke-dasharray 1.1s cubic-bezier(.2,.8,.2,1)}
+.lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.tile{background:var(--card);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow);display:block;transition:background .2s}
+.tile .v{font-size:24px;font-weight:620;margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.tile .v small,.big small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+.delta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.good{color:var(--green)}.bad{color:var(--red)}
+.card{display:block;background:var(--card);border-radius:20px;padding:18px 18px 14px;margin-bottom:12px;box-shadow:var(--shadow);
+transition:background .2s}
+.card>h2{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600;
+margin-bottom:12px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card>h2 span:last-child{letter-spacing:0;text-transform:none;font-weight:400}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:2px 12px;margin-bottom:12px}
+.stat{padding:6px 0}.stat .k{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.stat .x{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .x small{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}.stat .n{font-size:11px;color:var(--muted)}
+.chart{position:relative;width:100%;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12px;padding:5px 9px;
+border-radius:8px;white-space:nowrap;transform:translate(-50%,-100%);top:0;opacity:0;transition:opacity .12s;z-index:2}
+.cur,.dot{transition:opacity .12s}
+.line{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:draw 1s cubic-bezier(.3,.7,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.area{opacity:0;animation:fadein .8s .25s forwards}@keyframes fadein{to{opacity:1}}
+.bar{transform-box:fill-box;transform-origin:bottom;animation:grow .6s cubic-bezier(.3,.7,.2,1) both}
+@keyframes grow{from{transform:scaleY(0)}}
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 6px;margin:0 -6px;border-top:1px solid var(--line);
+gap:12px;border-radius:10px;transition:background .2s}
+.row:first-of-type{border-top:0}.row .t{font-weight:550}.row .s{font-size:12px;color:var(--muted)}
+.row .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+.seg{display:flex;gap:3px;background:var(--soft);padding:3px;border-radius:999px;width:max-content;margin:0 auto 16px}
+.seg a{font-size:12px;padding:5px 14px;border-radius:999px;color:var(--muted)}.seg a.on{background:var(--card);color:var(--fg)}
+.two{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.two .card{margin:0}
+.zbar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--soft);margin:4px 0 12px}
+.zrow{display:grid;grid-template-columns:70px 1fr 100px;align-items:center;gap:10px;font-size:13px;padding:4px 0}
+.zrow .b{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}.zrow .b i{display:block;height:100%}
+.zrow .m{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.contrib{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 0;border-top:1px solid var(--line)}
+.contrib:first-of-type{border-top:0}.contrib .t{font-weight:550}.contrib .s{font-size:12px;color:var(--muted)}
+.contrib .r{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.range{grid-column:1/3;height:6px;border-radius:3px;background:var(--soft);position:relative;margin-top:6px}
+.range i{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;transform:translateX(-50%);border:2px solid var(--card)}
+.range b{position:absolute;top:0;height:6px;border-radius:3px;background:var(--line)}
+.timeline{position:relative;height:34px;border-radius:9px;background:var(--violet);overflow:hidden;margin:6px 0 4px}
+.timeline i{position:absolute;top:0;bottom:0;background:var(--soft)}
+.tl-l{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.verdict{font-size:14px;text-align:center;color:var(--muted);margin:12px auto 4px;max-width:540px}
+.big{font-size:44px;font-weight:650;text-align:center;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.desc{font-size:13px;color:var(--muted);line-height:1.55}
+.insight{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.45}
+.insight:first-of-type{border-top:0}.insight .ic{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+font-size:13px;font-weight:700;color:#fff}
+.alert{border:1px solid color-mix(in srgb,var(--red) 35%,transparent);background:color-mix(in srgb,var(--red) 7%,var(--card))}
+.cal{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;gap:4px;justify-content:start;overflow-x:auto;padding-bottom:4px}
+.cal i{width:18px;height:18px;border-radius:5px;background:var(--soft);display:block}
+.cal-l{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:10px;align-items:center}
+.cal-l i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
+.corr{display:grid;grid-template-columns:1fr 120px 54px;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.corr:first-of-type{border-top:0}.corr .s{font-size:12px;color:var(--muted)}
+.cbar{height:8px;background:var(--soft);border-radius:4px;position:relative}
+.cbar i{position:absolute;top:0;height:8px;border-radius:4px}.cbar:after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted);opacity:.5}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week a{background:var(--soft);border-radius:12px;padding:8px 2px;transition:background .2s}.week a:hover{background:var(--line)}
+.week .dn{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.week .rc{width:30px;height:30px;border-radius:50%;margin:6px auto;display:grid;place-items:center;font-size:12px;font-weight:650;color:#fff}
+.week .sm{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cmp{display:grid;grid-template-columns:1fr auto auto;gap:4px 16px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.cmp:first-of-type{border-top:0}.cmp .v{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.rec{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line)}.rec:first-of-type{border-top:0}
+.rec .v{font-weight:650;font-variant-numeric:tabular-nums}.rec .s{font-size:12px;color:var(--muted)}
+footer{margin-top:24px;font-size:12px;color:var(--muted);text-align:center;line-height:1.8}
+@media (max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}
+.rings{gap:8px}.ring{padding:14px 4px 12px}.datebar h1{min-width:0;font-size:15px}.big{font-size:36px}
+.tabs a{padding:6px 10px}.corr{grid-template-columns:1fr 80px 46px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.line{stroke-dasharray:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header id="head"></header>
+  <main id="app"></main>
+  <footer id="foot"></footer>
+</div>
+<script id="data" type="application/json">{}</script>
+<script>
+window.addEventListener('error', e => { const a = document.getElementById('app');
+  if (a && !a.innerHTML.trim()) a.innerHTML = '<div class="card"><b>L’appli n’a pas pu s’afficher.</b><p class="desc" style="margin-top:6px">'
+    + String(e.message).replace(/[<>&]/g, '') + ' (ligne ' + e.lineno + ')</p><p class="desc">Envoie une capture de cet écran pour corriger le problème.</p></div>'; });
+</script>
+<script type="text/whoop-ui" id="ui">
+const D = window.D_DATA;
+const app = document.getElementById('app'), head = document.getElementById('head');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const NEED = D.profile.sleepNeed * 60, HRMAX = D.profile.hrMax;
+const IDX = Object.fromEntries(D.days.map((d, i) => [d.date, i]));
+const LAST = D.days.length ? D.days[D.days.length - 1].date : null;
+
+// ---------- formatage
+const fmt = (v, d = 0) => v == null || isNaN(v) ? '—' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits: d, minimumFractionDigits: d});
+const hm = m => m == null ? '—' : `${Math.floor(m / 60)} h ${String(Math.round(m % 60)).padStart(2, '0')}`;
+const hhmm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
+const clock = iso => iso ? new Date(iso).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) : '—';
+const longDate = iso => new Date(iso + 'T12:00').toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
+const shortDate = iso => new Date(iso + 'T12:00').toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'});
+const dayShort = iso => new Date(iso + 'T12:00').toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '');
+const addDays = (iso, n) => { const t = new Date(iso + 'T12:00'); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
+const mean = a => { a = a.filter(x => x != null); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+const sum = a => a.filter(x => x != null).reduce((s, x) => s + x, 0);
+const sd = a => { a = a.filter(x => x != null); if (a.length < 2) return null; const m = mean(a); return Math.sqrt(mean(a.map(x => (x - m) ** 2))); };
+const median = a => { a = a.filter(x => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };
+const recColor = v => v == null ? css('--line') : v >= 67 ? css('--green') : v >= 34 ? css('--yellow') : css('--red');
+const isFoot = s => ['Run', 'TrailRun', 'VirtualRun', 'Walk', 'Hike'].includes(s);
+const pace = a => !a.speed ? null : isFoot(a.sport) ? (s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')} /km`)(1000 / a.speed) : fmt(a.speed * 3.6, 1) + ' km/h';
+
+// ---------- données minute par minute (FC + pas)
+const MIN = new Map();
+for (const [date, arr] of Object.entries(D.curves)) {
+  const base = Math.round(new Date(date + 'T00:00').getTime() / 60000);
+  for (let i = 0; i < arr.length; i += 3) MIN.set(base + arr[i], {hr: arr[i + 1] || null, st: arr[i + 2]});
+}
+const epochMin = iso => Math.round(new Date(iso).getTime() / 60000);
+const dayBase = date => Math.round(new Date(date + 'T00:00').getTime() / 60000);
+const minLabel = t => new Date(t * 60000).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+function hrBetween(a, b) { const out = []; for (let t = a; t <= b; t++) { const m = MIN.get(t); if (m && m.hr) out.push({x: t - a, y: m.hr, t}); } return out; }
+const nightOf = date => D.sleeps.filter(s => s.date === date && s.type === 'Nuit').sort((a, b) => b.asleep - a.asleep)[0];
+function busyMinutes(date) {  // minutes de sommeil ou d'activité (exclues du stress)
+  const set = new Set(), a = dayBase(date), b = a + 1440;
+  [...D.sleeps, ...D.acts].forEach(s => { for (let t = Math.max(a, epochMin(s.start)); t < Math.min(b, epochMin(s.end)); t++) set.add(t); });
+  return set;
+}
+
+// ---------- stress (0-3), inspiré du Stress Monitor du WHOOP 5.0
+function refRhr(idx) { for (let i = idx; i >= Math.max(0, idx - 14); i--) if (D.days[i].rhr) return D.days[i].rhr; return null; }
+function stressDay(idx) {
+  const d = D.days[idx], base = dayBase(d.date), busy = busyMinutes(d.date), pts = [];
+  let ref = refRhr(idx);
+  if (!ref) { const hs = []; for (let m = 0; m < 1440; m++) { const v = MIN.get(base + m); if (v && v.hr) hs.push(v.hr); } ref = hs.length ? Math.min(...hs) : null; }
+  if (!ref) return null;
+  const span = Math.max(15, (HRMAX - ref) * 0.35);
+  for (let m = 0; m < 1440; m++) {
+    const t = base + m, v = MIN.get(t);
+    if (v && v.hr && !busy.has(t)) pts.push({x: m, t, y: Math.max(0, Math.min(3, (v.hr - ref) / span * 3))});
+  }
+  if (pts.length < 30) return null;
+  const sm = pts.map((p, i) => ({...p, y: mean(pts.slice(Math.max(0, i - 4), i + 5).filter(q => Math.abs(q.x - p.x) <= 6).map(q => q.y))}));
+  const lvl = [0, 0, 0]; sm.forEach(p => lvl[p.y < 1 ? 0 : p.y < 2 ? 1 : 2]++);
+  return {pts: sm, avg: mean(sm.map(p => p.y)), lvl, ref};
+}
+const STRESS = {};
+const stressOf = idx => (idx in STRESS) ? STRESS[idx] : (STRESS[idx] = stressDay(idx));
+
+// ---------- indicateurs
+const M = {
+  recovery: {name: 'Recovery', unit: '%', dig: 0, color: '--green', type: 'bar', min: 0, max: 100, colorFn: recColor, better: 'up',
+    desc: 'Ta capacité à encaisser un effort aujourd’hui : HRV et FC de repos de la nuit comparées à ta référence personnelle (30 nuits), plus la qualité du sommeil.'},
+  strain: {name: 'Strain', unit: '/ 21', dig: 1, color: '--blue', type: 'bar', min: 0, max: 21,
+    desc: 'Charge cardio-vasculaire de la journée, de 0 à 21 (échelle logarithmique) : temps passé dans chaque zone de fréquence cardiaque.'},
+  sleepH: {name: 'Sommeil', unit: 'h', dig: 1, color: '--violet', type: 'bar', min: 0, get: d => d.sleep == null ? null : d.sleep / 60,
+    desc: 'Temps réellement endormi pendant la nuit (hors réveils).'},
+  hrv: {name: 'HRV', unit: 'ms', dig: 0, color: '--violet', better: 'up',
+    desc: 'Variabilité de la fréquence cardiaque pendant la nuit (RMSSD). Plus elle est haute par rapport à ton habitude, mieux ton système nerveux a récupéré.'},
+  rhr: {name: 'FC de repos', unit: 'bpm', dig: 0, color: '--red', better: 'down',
+    desc: 'Fréquence cardiaque la plus basse de la nuit (moyenne sur 5 min). Une hausse inhabituelle signale souvent fatigue, stress, alcool ou début de maladie.'},
+  resp: {name: 'Respiration', unit: '/min', dig: 1, color: '--teal',
+    desc: 'Fréquence respiratoire pendant le sommeil, déduite du rythme cardiaque (expérimental). Elle varie très peu d’une nuit à l’autre : une hausse nette peut annoncer une maladie.'},
+  spo2: {name: 'SpO2', unit: '%', dig: 0, color: '--blue', desc: 'Saturation du sang en oxygène, mesurée par le bracelet pendant le sommeil (expérimental). Normalement entre 95 et 100 %.'},
+  temp: {name: 'Temp. peau', unit: '°C', dig: 1, color: '--yellow',
+    desc: 'Température de la peau pendant la nuit. C’est l’écart à ton habitude qui compte : une hausse de plus de 0,5 °C mérite attention.'},
+  vo2: {name: 'VO2max', unit: 'ml/kg/min', dig: 1, color: '--blue', better: 'up',
+    desc: 'Estimation de ta capacité aérobie (formule d’Uth : FC max / FC de repos des 7 dernières nuits). Elle progresse avec l’endurance.'},
+  steps: {name: 'Pas', unit: '', dig: 0, color: '--green', type: 'bar', min: 0, better: 'up', desc: 'Nombre de pas compté par le bracelet.'},
+  cal: {name: 'Calories', unit: 'kcal', dig: 0, color: '--amber', type: 'bar', min: 0,
+    desc: 'Dépense énergétique estimée sur les minutes mesurées : métabolisme de base + effort (fréquence cardiaque, âge, poids, sexe).'},
+  stress: {name: 'Stress', unit: '/ 3', dig: 1, color: '--amber', min: 0, max: 3, better: 'down', get: (d, i) => { const s = stressOf(i); return s ? s.avg : null; },
+    desc: 'Niveau de stress moyen de la journée, de 0 à 3, hors sommeil et activités : fréquence cardiaque au-dessus de ton repos sans effort physique. Calme < 1, modéré 1-2, élevé > 2.'},
+};
+const val = (d, k, i) => d ? (M[k] && M[k].get ? M[k].get(d, i ?? IDX[d.date]) : d[k]) : null;
+const range = (key, endIdx, n) => D.days.slice(Math.max(0, endIdx - n + 1), endIdx + 1).map((d, j) => ({date: d.date, y: val(d, key, Math.max(0, endIdx - n + 1) + j)}));
+function stats(key, endIdx, n) {
+  const pts = range(key, endIdx, n).filter(p => p.y != null);
+  if (!pts.length) return null;
+  const mn = pts.reduce((a, b) => b.y < a.y ? b : a), mx = pts.reduce((a, b) => b.y > a.y ? b : a);
+  return {avg: mean(pts.map(p => p.y)), min: mn, max: mx, n: pts.length};
+}
+function baseline(key, idx, n = 30) {
+  const ys = []; for (let i = Math.max(0, idx - n); i < idx; i++) { const v = val(D.days[i], key, i); if (v != null) ys.push(v); }
+  return ys.length >= 3 ? {avg: mean(ys), sd: sd(ys), n: ys.length} : null;
+}
+function deltaHtml(key, idx) {
+  const v = val(D.days[idx], key, idx), b = baseline(key, idx);
+  if (v == null || !b || !b.avg) return '<span class="delta">&nbsp;</span>';
+  const pct = (v - b.avg) / b.avg * 100, better = M[key].better;
+  const cls = Math.abs(pct) < 3 || !better ? '' : (pct > 0) === (better === 'up') ? 'good' : 'bad';
+  return `<span class="delta ${cls}">${pct >= 0 ? '▲' : '▼'} ${fmt(Math.abs(pct))} % vs moy. 30 j</span>`;
+}
+
+// ---------- graphiques (SVG net, courbes lissées, animés, interactifs)
+let charts = [], animate = true, gid = 0;
+const chartBox = cfg => { charts.push(cfg); return `<div class="chart" data-c="${charts.length - 1}" style="height:${cfg.h || 170}px"></div>`; };
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw || 1)), step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw) || mag;
+  const out = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(6)); return out;
+}
+function smoothPath(P) {  // interpolation monotone (pas de dépassement), courbe douce
+  if (P.length < 3) return P.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+  const n = P.length, dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = Math.max(1e-6, P[i + 1][0] - P[i][0]); m[i] = (P[i + 1][1] - P[i][1]) / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+  for (let i = 0; i < n - 1; i++) { if (m[i] === 0) { t[i] = t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b; if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
+  let d = `M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3;
+    d += `C${(P[i][0] + h).toFixed(1)} ${(P[i][1] + t[i] * h).toFixed(1)} ${(P[i + 1][0] - h).toFixed(1)} ${(P[i + 1][1] - t[i + 1] * h).toFixed(1)} ${P[i + 1][0].toFixed(1)} ${P[i + 1][1].toFixed(1)}`; }
+  return d;
+}
+function drawChart(el, c) {
+  const W = el.clientWidth, H = c.h || 170, P = {l: 4, r: 40, t: 20, b: 22};
+  let pts = c.points.filter(p => p.y != null);
+  if (!pts.length) { el.style.height = 'auto'; el.innerHTML = '<div class="empty">Pas encore de données sur cette période.</div>'; return; }
+  if (c.smoothWin) pts = pts.map((p, i) => ({...p, raw: p.y, y: mean(pts.slice(Math.max(0, i - c.smoothWin), i + c.smoothWin + 1)
+    .filter(q => Math.abs(q.x - p.x) <= c.smoothWin + 1).map(q => q.y))}));
+  const xs = c.points.map(p => p.x), x0 = c.x0 ?? Math.min(...xs), x1 = c.x1 ?? Math.max(...xs), ys = pts.map(p => p.raw ?? p.y);
+  const extra = [...(c.band || []), ...(c.ref != null ? [c.ref] : [])];
+  let lo = c.min ?? Math.min(...ys, ...extra), hi = c.max ?? Math.max(...ys, ...extra);
+  if (c.min == null) { const m = (hi - lo) * 0.18 || Math.abs(hi) * 0.05 || 1; lo -= m; }
+  if (c.max == null) { const m = (hi - lo) * 0.12 || 1; hi += m; }
+  const n = c.points.length, bar = c.type === 'bar';
+  const bw = bar ? Math.max(3, Math.min(24, (W - P.l - P.r) / Math.max(n, 1) * 0.62)) : 0;
+  const X = v => x1 === x0 ? (P.l + W - P.r) / 2 : P.l + bw / 2 + (v - x0) / (x1 - x0) * (W - P.l - P.r - bw);
+  const Y = v => P.t + (hi - v) / (hi - lo) * (H - P.t - P.b);
+  const crisp = v => Math.round(v) + .5;
+  const col = css(c.color || '--blue'), muted = css('--muted'), line = css('--line'), id = 'g' + (gid++);
+  let s = `<svg width="${W}" height="${H}" style="display:block"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`;
+  (c.regions || []).forEach(r => { const a = Math.max(X(r.x0), P.l), b = Math.min(X(r.x1), W - P.r);
+    if (b > a) s += `<rect x="${a}" y="${P.t - 8}" width="${b - a}" height="${H - P.b - P.t + 8}" fill="${css(r.color)}" opacity=".10" rx="4"/>`; });
+  if (c.band) s += `<rect x="${P.l}" y="${Y(c.band[1])}" width="${W - P.l - P.r}" height="${Math.max(1, Y(c.band[0]) - Y(c.band[1]))}" fill="${col}" opacity=".07" rx="3"/>`;
+  niceTicks(lo, hi, 3).forEach(t => { s += `<line x1="${P.l}" x2="${W - P.r}" y1="${crisp(Y(t))}" y2="${crisp(Y(t))}" stroke="${line}"/>
+    <text x="${W - P.r + 7}" y="${Y(t) + 4}" font-size="11" fill="${muted}">${fmt(t, c.tickDig || 0)}</text>`; });
+  if (c.ref != null) s += `<line x1="${P.l}" x2="${W - P.r}" y1="${crisp(Y(c.ref))}" y2="${crisp(Y(c.ref))}" stroke="${muted}" stroke-dasharray="4 4" opacity=".8"/>
+    <text x="${P.l + 2}" y="${Y(c.ref) - 6}" font-size="11" fill="${muted}">${c.refLabel || ''}</text>`;
+  if (c.avg && ys.length > 1) { const a = mean(ys);
+    s += `<line x1="${P.l}" x2="${W - P.r}" y1="${crisp(Y(a))}" y2="${crisp(Y(a))}" stroke="${col}" stroke-dasharray="2 5" opacity=".75"/>
+    <text x="${P.l + 2}" y="${Y(a) - 6}" font-size="11" fill="${col}">moy. ${fmt(a, c.dig || 0)}</text>`; }
+  if (bar) {
+    pts.forEach((p, i) => { const top = Y(Math.max(p.y, lo)), base = Y(Math.max(lo, 0));
+      s += `<rect class="${animate ? 'bar' : ''}" style="animation-delay:${Math.min(i * 18, 400)}ms" x="${(X(p.x) - bw / 2).toFixed(1)}" y="${Math.min(top, base - 2).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(2, base - top).toFixed(1)}" rx="${Math.min(5, bw / 3)}" fill="${c.colorFn ? c.colorFn(p.y) : col}"/>`; });
+  } else {
+    const segs = []; let cur = null, prev = null;
+    pts.forEach(p => { if (!prev || (c.gap && p.x - prev.x > c.gap)) { cur = []; segs.push(cur); } cur.push([X(p.x), Y(p.y)]); prev = p; });
+    const base = H - P.b;
+    segs.forEach(sg => { const d = smoothPath(sg);
+      if (c.area !== false && sg.length > 1) s += `<path class="${animate ? 'area' : ''}" d="${d}L${sg[sg.length - 1][0].toFixed(1)} ${base}L${sg[0][0].toFixed(1)} ${base}Z" fill="url(#${id})"/>`;
+      s += `<path class="${animate ? 'line' : ''}" d="${d}" fill="none" stroke="${col}" stroke-width="${c.thin ? 1.7 : 2.3}" stroke-linejoin="round" stroke-linecap="round"/>`; });
+    if (pts.length <= 40) pts.forEach(p => s += `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3" fill="${css('--card')}" stroke="${col}" stroke-width="2"/>`);
+  }
+  if (c.marks && pts.length > 2) {
+    const key = p => p.raw ?? p.y, mn = pts.reduce((a, b) => key(b) < key(a) ? b : a), mx = pts.reduce((a, b) => key(b) > key(a) ? b : a);
+    [[mx, -10, 'max'], [mn, 18, 'min']].forEach(([p, dy, k]) => { const x = Math.min(Math.max(X(p.x), P.l + 26), W - P.r - 26);
+      s += `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="4" fill="${css('--card')}" stroke="${col}" stroke-width="2.2"/>
+      <text x="${x}" y="${Y(p.y) + dy}" text-anchor="middle" font-size="11" font-weight="650" fill="${css('--fg')}">${k} ${fmt(key(p), c.dig || 0)}</text>`; });
+  }
+  (c.xTicks || []).forEach(t => { const x = Math.min(Math.max(X(t.x), P.l + 14), W - P.r - 14);
+    s += `<text x="${x}" y="${H - 5}" text-anchor="middle" font-size="11" fill="${muted}">${t.label}</text>`; });
+  s += `<line class="cur" x1="0" x2="0" y1="${P.t - 8}" y2="${H - P.b}" stroke="${muted}" opacity="0"/><circle class="dot" r="4.5" fill="${col}" stroke="${css('--card')}" stroke-width="2" opacity="0"/></svg>`;
+  el.innerHTML = s + '<div class="tip"></div>';
+  el.querySelectorAll('path.line').forEach(p => p.style.setProperty('--len', Math.ceil(p.getTotalLength() + 2)));
+  const svg = el.querySelector('svg'), tip = el.querySelector('.tip'), cur = svg.querySelector('.cur'), dot = svg.querySelector('.dot');
+  const px = pts.map(p => X(p.x));
+  let raf = 0, lastE = null;
+  const show = () => { raf = 0; const e = lastE, r = svg.getBoundingClientRect(), mx = e.clientX - r.left;
+    let lo2 = 0, hi2 = px.length - 1; while (hi2 - lo2 > 1) { const mid = (lo2 + hi2) >> 1; if (px[mid] < mx) lo2 = mid; else hi2 = mid; }
+    const i = Math.abs(px[lo2] - mx) <= Math.abs(px[hi2] - mx) ? lo2 : hi2, best = pts[i], x = px[i], y = Y(best.y);
+    cur.setAttribute('x1', crisp(x)); cur.setAttribute('x2', crisp(x)); cur.setAttribute('opacity', .45);
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('opacity', bar ? 0 : 1);
+    tip.style.opacity = 1; tip.style.left = Math.min(Math.max(x, 64), W - 64) + 'px'; tip.style.top = (Math.max(y, P.t) - 10) + 'px';
+    const shown = {...best, y: best.raw ?? best.y};
+    tip.innerHTML = c.tip ? c.tip(shown) : `${shown.label} · <b>${fmt(shown.y, c.dig || 0)}</b> ${c.unit || ''}`; };
+  const move = e => { lastE = e; if (!raf) raf = requestAnimationFrame(show); };
+  const leave = () => { tip.style.opacity = 0; cur.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move); svg.addEventListener('pointerleave', leave);
+}
+function mountCharts() { document.querySelectorAll('.chart[data-c]').forEach(el => drawChart(el, charts[+el.dataset.c])); }
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { animate = false; mountCharts(); }, 120); });
+
+function dailyChart(key, idx, n, opts = {}) {
+  const m = M[key], start = Math.max(0, idx - n + 1), pts = range(key, idx, n).map((p, i) => ({x: i, y: p.y, label: shortDate(p.date), date: p.date}));
+  const step = Math.max(1, Math.ceil(pts.length / 6)), ticks = pts.filter((_, i) => i % step === 0 || i === pts.length - 1).map(p => ({x: p.x, label: p.label}));
+  return chartBox({points: pts, type: m.type || 'line', color: m.color, colorFn: m.colorFn, min: m.min, max: m.max, dig: m.dig,
+    unit: m.unit, avg: true, xTicks: ticks, tickDig: m.dig > 0 && key !== 'strain' ? 1 : 0, ...opts});
+}
+const hrChart = (points, opts = {}) => chartBox({points, color: '--red', unit: 'bpm', gap: 4, marks: true, thin: true, h: 200, smoothWin: 2,
+  tip: p => `${minLabel(p.t)} · <b>${p.y}</b> bpm`, ...opts});
+function dayRegions(date) {
+  const base = dayBase(date);
+  return [...D.sleeps.map(s => ({x0: epochMin(s.start) - base, x1: epochMin(s.end) - base, color: '--violet'})),
+    ...D.acts.map(a => ({x0: epochMin(a.start) - base, x1: epochMin(a.end) - base, color: '--blue'}))];
+}
+const hourTicks = [0, 6, 12, 18, 24].map(h => ({x: h * 60, label: h + ' h'}));
+function dayHr(date) { const a = dayBase(date); return hrBetween(a, a + 1439).map(p => ({...p, x: p.t - a})); }
+function rangeTicks(pts) {
+  if (!pts.length) return [];
+  const a = pts[0].t, b = pts[pts.length - 1].t, step = (b - a) > 360 ? 120 : (b - a) > 120 ? 60 : (b - a) > 40 ? 15 : 5, out = [];
+  for (let t = Math.ceil(a / step) * step; t <= b; t += step) out.push({x: t - a, label: minLabel(t)});
+  return out;
+}
+const statBox = (k, x, unit = '', n = '') => `<div class="stat"><div class="k">${k}</div><div class="x">${x}${x !== '—' && unit ? `<small>${unit}</small>` : ''}</div>${n ? `<div class="n">${n}</div>` : ''}</div>`;
+function hrStats(pts) {
+  if (!pts.length) return '';
+  const mn = pts.reduce((a, b) => b.y < a.y ? b : a), mx = pts.reduce((a, b) => b.y > a.y ? b : a);
+  return `<div class="stats">${statBox('Min', fmt(mn.y), 'bpm', 'à ' + minLabel(mn.t))}${statBox('Moyenne', fmt(mean(pts.map(p => p.y))), 'bpm')}
+    ${statBox('Max', fmt(mx.y), 'bpm', 'à ' + minLabel(mx.t))}${statBox('Mesuré', hm(pts.length))}</div>`;
+}
+function hourlySteps(date) {
+  const a = dayBase(date), hrs = Array(24).fill(0);
+  for (let m = 0; m < 1440; m++) { const v = MIN.get(a + m); if (v) hrs[Math.floor(m / 60)] += v.st || 0; }
+  return hrs;
+}
+
+// ---------- éléments
+function ring(frac, color, value, unit, size = 130) {
+  const r = 52, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, frac || 0));
+  return `<svg viewBox="0 0 132 132" style="max-width:${size}px"><circle cx="66" cy="66" r="${r}" fill="none" stroke="${css('--soft')}" stroke-width="9"/>
+  ${f > 0 ? `<circle class="arc" data-d="${c * f}" cx="66" cy="66" r="${r}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${animate ? 0 : c * f} ${c}" transform="rotate(-90 66 66)"/>` : ''}
+  <text x="66" y="${unit ? 70 : 76}" text-anchor="middle" font-size="27" font-weight="650" fill="${css('--fg')}">${value}</text>
+  ${unit ? `<text x="66" y="90" text-anchor="middle" font-size="11" fill="${css('--muted')}">${unit}</text>` : ''}</svg>`;
+}
+function tile(key, idx) {
+  const m = M[key], v = val(D.days[idx], key, idx);
+  return `<a class="tile" href="#/m/${key}/${D.days[idx].date}"><div class="lbl">${m.name}</div>
+    <div class="v">${fmt(v, m.dig)}${v != null && m.unit ? `<small>${m.unit}</small>` : ''}</div>${deltaHtml(key, idx)}</a>`;
+}
+function zonesHtml(zones) {
+  const tot = sum(zones || []);
+  if (!tot) return '<div class="empty">Pas de temps passé au-dessus de 50 % de ta FC max.</div>';
+  const cols = ['--z1', '--z2', '--z3', '--z4', '--z5'];
+  return `<div class="zbar">${zones.map((z, i) => z ? `<i style="width:${z / tot * 100}%;background:${css(cols[i])}"></i>` : '').join('')}</div>` +
+    zones.map((z, i) => `<div class="zrow"><div>Zone ${i + 1}</div><div class="b"><i style="width:${(z || 0) / tot * 100}%;background:${css(cols[i])}"></i></div>
+    <div class="m">${hm(z || 0)} · ${Math.round(HRMAX * (0.5 + 0.1 * i))}+ bpm</div></div>`).reverse().join('');
+}
+const actRow = (a, i) => `<a class="row" href="#/act/${i}"><div><div class="t">${a.name || a.type}</div>
+  <div class="s">${clock(a.start)} · ${Math.round(a.dur)} min${a.km ? ' · ' + fmt(a.km, 1) + ' km' : ''} · FC moy. ${fmt(a.hrAvg)} bpm</div></div>
+  <div class="r"><div class="t">${fmt(a.strain, 1)}</div><div class="s">strain</div></div></a>`;
+function navDate(view, idx, extra = '') {
+  const prev = idx > 0 ? `<a href="#/${view}/${D.days[idx - 1].date}${extra}">‹</a>` : '<span class="dis">‹</span>';
+  const next = idx < D.days.length - 1 ? `<a href="#/${view}/${D.days[idx + 1].date}${extra}">›</a>` : '<span class="dis">›</span>';
+  return `<div class="datebar">${prev}<h1>${longDate(D.days[idx].date)}</h1>${next}</div>`;
+}
+
+// ---------- sommeil : dette, régularité, heure de coucher conseillée
+function sleepWeek(idx) {
+  const nights = D.days.slice(Math.max(0, idx - 6), idx + 1).map(x => nightOf(x.date)).filter(Boolean);
+  const tod = iso => { const t = new Date(iso); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; };
+  const debt = sum(nights.map(x => Math.max(0, NEED - x.asleep)));
+  const wake = median(nights.map(x => tod(x.end))), awake = mean(nights.map(x => x.inbed - x.asleep)) || 15;
+  const tonightNeed = NEED + Math.min(60, debt * 0.25);
+  return {nights, debt, avg: mean(nights.map(x => x.asleep)), regBed: sd(nights.map(x => tod(x.start))), regWake: sd(nights.map(x => tod(x.end))),
+    wake, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed};
+}
+
+// ---------- bilan du jour (conseils automatiques)
+function insights(idx) {
+  const d = D.days[idx], out = [], bh = baseline('hrv', idx), br = baseline('rhr', idx), bresp = baseline('resp', idx);
+  const add = (color, icon, text) => out.push({color, icon, text});
+  let alert = null;
+  if (d.rhr && br && d.rhr - br.avg >= 3 && ((d.dtemp != null && d.dtemp >= 0.4) || (d.resp && bresp && d.resp - bresp.avg >= 1)))
+    alert = `FC de repos +${fmt(d.rhr - br.avg)} bpm${d.dtemp >= 0.4 ? `, température +${fmt(d.dtemp, 1)} °C` : ''}${d.resp && bresp && d.resp - bresp.avg >= 1 ? ', respiration en hausse' : ''} : signes possibles de fatigue ou de début de maladie. Lève le pied aujourd’hui.`;
+  if (d.recovery != null) {
+    const t = d.recovery >= 67 ? [14, 18] : d.recovery >= 34 ? [10, 14] : [0, 10];
+    add(recColor(d.recovery), '%', `Recovery ${d.recovery} % : ${d.recovery >= 67 ? 'ton corps est prêt pour un gros effort' : d.recovery >= 34 ? 'effort modéré conseillé' : 'journée de récupération conseillée'} (strain cible ${t[0]}-${t[1]}).`);
+  } else if (d.sleep != null) add(css('--muted'), '…', `Recovery en calibrage (${Math.min(d.calibrage, 4)}/4 nuits) : encore ${Math.max(0, 4 - d.calibrage)} nuit${4 - d.calibrage > 1 ? 's' : ''} pour connaître tes valeurs habituelles.`);
+  if (d.hrv && bh) { const p = (d.hrv - bh.avg) / bh.avg * 100;
+    if (Math.abs(p) >= 8) add(p > 0 ? css('--green') : css('--red'), p > 0 ? '▲' : '▼', `HRV ${p > 0 ? 'au-dessus' : 'en dessous'} de ton habitude (${fmt(d.hrv)} ms contre ${fmt(bh.avg)} ms).`); }
+  if (d.sleep != null) { const w = sleepWeek(idx), pct = d.sleep / NEED * 100;
+    add(css('--violet'), 'z', `${hm(d.sleep)} de sommeil (${fmt(pct)} % de ton besoin)${w.debt >= 60 ? ` · dette de ${hm(w.debt)} sur 7 jours` : ''}.`);
+    if (idx === D.days.length - 1 && w.bedtime != null) add(css('--violet'), '☾', `Ce soir, couche-toi vers ${hhmm(w.bedtime)} pour te lever à ${hhmm(w.wake)} avec ${hm(w.tonightNeed)} de sommeil.`); }
+  const st = stressOf(idx);
+  if (st && st.lvl[2] >= 30) add(css('--amber'), '!', `${hm(st.lvl[2])} de stress élevé aujourd’hui (hors sport).`);
+  if (d.steps != null && d.steps >= 10000) add(css('--green'), '✓', `${fmt(d.steps)} pas : objectif des 10 000 atteint.`);
+  return {out, alert};
+}
+
+// ---------- vues
+function viewDay(idx) {
+  const d = D.days[idx], night = nightOf(d.date), acts = D.acts.map((a, i) => [a, i]).filter(([a]) => a.date === d.date);
+  const sleepPct = d.sleep == null ? null : Math.round(d.sleep / NEED * 100);
+  const recSub = d.recovery != null ? (d.recovery >= 67 ? 'prêt à performer' : d.recovery >= 34 ? 'correcte' : 'repos conseillé')
+    : d.sleep == null ? 'en attente d’une nuit' : `calibrage ${Math.min(d.calibrage, 4)}/4 nuits`;
+  const hr = dayHr(d.date), ins = insights(idx), st = stressOf(idx), steps = hourlySteps(d.date);
+  return navDate('jour', idx) + (ins.alert ? `<div class="card alert"><div class="insight"><span class="ic" style="background:${css('--red')}">!</span><div>${ins.alert}</div></div></div>` : '') + `
+  <div class="rings">
+    <a class="ring" href="#/recovery/${d.date}">${ring((d.recovery || 0) / 100, recColor(d.recovery), d.recovery == null ? '—' : d.recovery + ' %', '')}<div class="lbl">Recovery</div><div class="sub">${recSub}</div></a>
+    <a class="ring" href="#/strain/${d.date}">${ring((d.strain || 0) / 21, css('--blue'), fmt(d.strain, 1), 'sur 21')}<div class="lbl">Strain</div><div class="sub">${d.nbAct} activité${d.nbAct > 1 ? 's' : ''}</div></a>
+    <a class="ring" href="#/sommeil/${d.date}">${ring((sleepPct || 0) / 100, css('--violet'), sleepPct == null ? '—' : sleepPct + ' %', d.sleep == null ? '' : hm(d.sleep))}<div class="lbl">Sommeil</div><div class="sub">${d.sleep == null ? 'pas de nuit' : 'de ton besoin'}</div></a>
+  </div>
+  ${ins.out.length ? `<div class="card"><h2><span>Bilan du jour</span></h2>${ins.out.map(i => `<div class="insight"><span class="ic" style="background:${i.color}">${i.icon}</span><div>${i.text}</div></div>`).join('')}</div>` : ''}
+  <div class="grid">${['hrv', 'rhr', 'stress', 'resp', 'spo2', 'temp', 'vo2', 'steps'].map(k => tile(k, idx)).join('')}</div>
+  <a class="card" href="#/hr/${d.date}"><h2><span>Fréquence cardiaque ›</span><span>sommeil en violet · activités en bleu</span></h2>${hrStats(hr)}${hrChart(hr, {x0: 0, x1: 1440, regions: dayRegions(d.date), xTicks: hourTicks, h: 180})}</a>
+  <div class="two">
+    <a class="card" href="#/stress/${d.date}"><h2><span>Stress ›</span><span>${st ? fmt(st.avg, 1) + ' / 3' : ''}</span></h2>${st ? chartBox({points: st.pts, x0: 0, x1: 1440, color: '--amber', min: 0, max: 3, gap: 20, h: 130, thin: true, xTicks: hourTicks, tickDig: 0,
+      tip: p => `${minLabel(p.t)} · stress <b>${fmt(p.y, 1)}</b>`}) : '<div class="empty">Pas assez de données éveillé.</div>'}</a>
+    <div class="card"><h2><span>Pas par heure</span><span>${fmt(d.steps)} au total</span></h2>${chartBox({points: steps.map((v, h) => ({x: h, y: v || null, label: `${h} h-${h + 1} h`})), type: 'bar', color: '--green', min: 0, x0: 0, x1: 23, h: 130, unit: 'pas',
+      xTicks: [0, 6, 12, 18, 23].map(h => ({x: h, label: h + ' h'}))})}</div>
+  </div>
+  <div class="card" style="margin-top:12px"><h2><span>Activités</span></h2>${acts.length ? acts.map(([a, i]) => actRow(a, i)).join('') : '<div class="empty">Aucune activité détectée ce jour.</div>'}</div>
+  <div class="card"><h2><span>Sommeil</span></h2>${night ? `<a class="row" href="#/sommeil/${d.date}"><div><div class="t">${clock(night.start)} → ${clock(night.end)}</div>
+    <div class="s">efficacité ${fmt(night.eff * 100)} % · ${night.wakes} réveil${night.wakes > 1 ? 's' : ''} · FC min ${fmt(night.hrMin)} bpm</div></div>
+    <div class="r"><div class="t">${hm(night.asleep)}</div><div class="s">endormi</div></div></a>` : '<div class="empty">Pas de nuit enregistrée pour ce jour.</div>'}</div>`;
+}
+function viewHr(idx) {
+  const d = D.days[idx], hr = dayHr(d.date), z = d.zones || [], restMin = hr.filter(p => p.y < (d.rhr || 0) + 10).length;
+  return navDate('hr', idx) + `<div class="card"><h2><span>Fréquence cardiaque de la journée</span></h2>${hrStats(hr)}
+    ${hrChart(hr, {x0: 0, x1: 1440, regions: dayRegions(d.date), xTicks: hourTicks, h: 260})}</div>
+  <div class="card"><div class="stats" style="margin:0">${statBox('FC de repos (nuit)', fmt(d.rhr), 'bpm')}${statBox('FC max théorique', fmt(HRMAX), 'bpm')}
+    ${statBox('Proche du repos', hm(restMin), '', '< repos + 10 bpm')}${statBox('Zones 1-5', hm(sum(z)))}</div></div>
+  <div class="card"><h2><span>Temps par zone cardiaque</span></h2>${zonesHtml(z)}</div>`;
+}
+function viewStress(idx) {
+  const d = D.days[idx], st = stressOf(idx);
+  if (!st) return navDate('stress', idx) + '<div class="card empty">Pas assez de données éveillé pour calculer le stress ce jour.</div>';
+  const tot = sum(st.lvl);
+  return navDate('stress', idx) + `<div class="card" style="text-align:center">${ring(st.avg / 3, css('--amber'), fmt(st.avg, 1), 'sur 3', 160)}
+    <p class="verdict">${st.avg < 1 ? 'Journée plutôt calme.' : st.avg < 2 ? 'Stress modéré.' : 'Journée stressante.'} Calculé hors sommeil et activités, par rapport à ta FC de repos (${fmt(st.ref)} bpm).</p></div>
+  <div class="card"><h2><span>Au fil de la journée</span></h2>${chartBox({points: st.pts, x0: 0, x1: 1440, color: '--amber', min: 0, max: 3, gap: 20, h: 200, thin: true, xTicks: hourTicks, marks: true, dig: 1,
+    tip: p => `${minLabel(p.t)} · stress <b>${fmt(p.y, 1)}</b>`})}</div>
+  <div class="card"><h2><span>Répartition</span></h2>
+    ${[['Calme', 0, '--green'], ['Modéré', 1, '--yellow'], ['Élevé', 2, '--red']].map(([k, i, c]) => `<div class="zrow"><div>${k}</div><div class="b"><i style="width:${st.lvl[i] / tot * 100}%;background:${css(c)}"></i></div><div class="m">${hm(st.lvl[i])} · ${fmt(st.lvl[i] / tot * 100)} %</div></div>`).join('')}</div>
+  <div class="card"><h2><span>Stress · 30 jours</span></h2>${dailyChart('stress', idx, 30)}</div>`;
+}
+function contrib(title, sub, valueTxt, v, b, better) {
+  let bar = '';
+  if (v != null && b && b.sd != null) {
+    const w = Math.max(b.sd, Math.abs(b.avg) * .02), lo = b.avg - 2.5 * w, hi = b.avg + 2.5 * w;
+    const pos = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)), nlo = (b.avg - b.sd - lo) / (hi - lo) * 100, nw = 2 * b.sd / (hi - lo) * 100;
+    const good = better ? ((v - b.avg) > 0) === (better === 'up') : null;
+    const color = Math.abs(v - b.avg) <= b.sd || good === null ? css('--muted') : good ? css('--green') : css('--red');
+    bar = `<div class="range"><b style="left:${Math.max(0, nlo)}%;width:${Math.min(100, nw)}%"></b><i style="left:${pos}%;background:${color}"></i></div>`;
+  }
+  return `<div class="contrib"><div><div class="t">${title}</div><div class="s">${sub}</div></div><div class="r">${valueTxt}</div>${bar}</div>`;
+}
+function viewRecovery(idx) {
+  const d = D.days[idx], v = d.recovery;
+  const verdict = v == null ? (d.sleep == null ? 'Il faut une nuit enregistrée pour calculer la Recovery.' :
+      `Calibrage en cours : ${Math.min(d.calibrage, 4)}/4 nuits de référence. La Recovery apparaît dès 4 nuits.`)
+    : v >= 67 ? 'Ton corps a bien récupéré : bonne journée pour un effort intense.'
+    : v >= 34 ? 'Récupération correcte : un effort modéré est adapté.' : 'Récupération faible : privilégie le repos et le sommeil.';
+  const bh = baseline('hrv', idx), br = baseline('rhr', idx), bresp = baseline('resp', idx), bt = baseline('temp', idx);
+  const pct = (x, b) => x == null || !b ? '' : ` (${x >= b.avg ? '+' : ''}${fmt((x - b.avg) / b.avg * 100)} %)`;
+  return navDate('recovery', idx) + `<div class="card" style="text-align:center">${ring((v || 0) / 100, recColor(v), v == null ? '—' : v + ' %', 'recovery', 170)}
+    <p class="verdict">${verdict}</p></div>
+  <div class="card"><h2><span>Ce qui compose ta Recovery</span><span>la zone grise = ta plage habituelle</span></h2>
+    ${contrib('HRV', bh ? `habitude ${fmt(bh.avg)} ms` : 'référence en cours', fmt(d.hrv) + ' ms' + pct(d.hrv, bh), d.hrv, bh, 'up')}
+    ${contrib('FC de repos', br ? `habitude ${fmt(br.avg)} bpm` : 'référence en cours', fmt(d.rhr) + ' bpm' + pct(d.rhr, br), d.rhr, br, 'down')}
+    ${contrib('Performance du sommeil', `besoin ${hm(NEED)}`, d.sleep == null ? '—' : fmt(d.sleep / NEED * 100) + ' %', null, null)}
+    ${contrib('Respiration', bresp ? `habitude ${fmt(bresp.avg, 1)} /min` : 'référence en cours', fmt(d.resp, 1) + ' /min', d.resp, bresp, null)}
+    ${contrib('Température de la peau', bt ? `habitude ${fmt(bt.avg, 1)} °C` : 'référence en cours', d.dtemp == null ? fmt(d.temp, 1) + ' °C' : (d.dtemp >= 0 ? '+' : '') + fmt(d.dtemp, 2) + ' °C', d.temp, bt, null)}
+  </div>
+  <div class="card"><h2><span>Recovery · 30 jours</span></h2>${dailyChart('recovery', idx, 30)}</div>
+  <div class="card"><p class="desc">${M.recovery.desc} Vert ≥ 67 %, jaune 34-66 %, rouge ≤ 33 %. Formule maison inspirée de WHOOP.</p></div>`;
+}
+function viewStrain(idx) {
+  const d = D.days[idx], s = d.strain || 0, acts = D.acts.map((a, i) => [a, i]).filter(([a]) => a.date === d.date);
+  const level = s < 10 ? 'Effort léger' : s < 14 ? 'Effort modéré' : s < 18 ? 'Effort élevé' : 'Effort très élevé';
+  const target = d.recovery == null ? null : d.recovery >= 67 ? [14, 18] : d.recovery >= 34 ? [10, 14] : [0, 10];
+  const hr = dayHr(d.date);
+  return navDate('strain', idx) + `<div class="card" style="text-align:center">${ring(s / 21, css('--blue'), fmt(d.strain, 1), 'sur 21', 170)}
+    <p class="verdict">${level}${target ? ` · strain conseillé selon ta Recovery : ${target[0]}-${target[1]}` : ''}</p>
+    <div class="stats" style="margin:8px 0 0">${statBox('Calories', fmt(d.cal), 'kcal')}${statBox('Pas', fmt(d.steps))}${statBox('Min. actives', fmt(d.active))}
+    ${statBox('FC moy.', fmt(d.hrAvg), 'bpm')}${statBox('FC max', fmt(d.hrMax), 'bpm')}</div></div>
+  <div class="card"><h2><span>Temps par zone cardiaque</span><span>FC max ${HRMAX} bpm</span></h2>${zonesHtml(d.zones)}</div>
+  <div class="card"><h2><span>Fréquence cardiaque</span></h2>${hrStats(hr)}${hrChart(hr, {x0: 0, x1: 1440, regions: dayRegions(d.date), xTicks: hourTicks})}</div>
+  <div class="card"><h2><span>Activités</span></h2>${acts.length ? acts.map(([a, i]) => actRow(a, i)).join('') : '<div class="empty">Aucune activité détectée ce jour.</div>'}</div>
+  <div class="card"><h2><span>Strain · 30 jours</span></h2>${dailyChart('strain', idx, 30)}</div>`;
+}
+function viewSleep(idx) {
+  const d = D.days[idx], n = nightOf(d.date), w = sleepWeek(idx);
+  const plan = idx === D.days.length - 1 && w.bedtime != null ? `<div class="card"><h2><span>Ce soir</span></h2><div class="stats" style="margin:0">
+    ${statBox('Coucher conseillé', hhmm(w.bedtime))}${statBox('Lever habituel', hhmm(w.wake))}${statBox('Sommeil visé', hm(w.tonightNeed))}</div>
+    <p class="desc">Basé sur ton besoin (${hm(NEED)}), ta dette de sommeil et le temps que tu passes éveillé au lit.</p></div>` : '';
+  if (!n) return navDate('sommeil', idx) + `<div class="card empty">Pas de nuit enregistrée pour ce jour.</div>${plan}
+    <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin'})}</div>`;
+  const pct = Math.round(n.asleep / NEED * 100), a = epochMin(n.start), span = epochMin(n.end) - a;
+  const segs = n.wakeSegs.map(([s, e]) => `<i style="left:${(epochMin(s) - a) / span * 100}%;width:${Math.max(.4, (epochMin(e) - epochMin(s)) / span * 100)}%"></i>`).join('');
+  const pts = hrBetween(a, epochMin(n.end));
+  return navDate('sommeil', idx) + `<div class="card" style="text-align:center">${ring(pct / 100, css('--violet'), pct + ' %', hm(n.asleep), 170)}
+    <p class="verdict">${pct >= 85 ? 'Sommeil suffisant.' : pct >= 70 ? 'Sommeil un peu court.' : 'Sommeil insuffisant.'} Besoin : ${hm(NEED)}.</p></div>
+  <div class="card"><h2><span>Ta nuit</span><span>violet = endormi · clair = réveillé</span></h2>
+    <div class="timeline">${segs}</div><div class="tl-l"><span>${clock(n.start)}</span><span>${clock(n.end)}</span></div>
+    <div class="stats" style="margin:14px 0 0">${statBox('Endormi', hm(n.asleep))}${statBox('Au lit', hm(n.inbed))}${statBox('Efficacité', fmt(n.eff * 100), '%')}
+    ${statBox('Réveils', fmt(n.wakes))}${statBox('FC min', fmt(n.hrMin), 'bpm')}${statBox('FC moy.', fmt(n.hrAvg), 'bpm')}${statBox('HRV', fmt(n.hrv), 'ms')}
+    ${statBox('Respiration', fmt(n.resp, 1), '/min')}${statBox('SpO2', fmt(n.spo2), '%')}${statBox('Temp. peau', fmt(n.temp, 1), '°C')}</div></div>
+  <div class="card"><h2><span>Fréquence cardiaque pendant la nuit</span></h2>${hrStats(pts)}${hrChart(pts, {xTicks: rangeTicks(pts), smoothWin: 3})}</div>
+  ${plan}
+  <div class="card"><h2><span>7 derniers jours</span></h2><div class="stats" style="margin:0">
+    ${statBox('Dette de sommeil', hm(w.debt))}${statBox('Moyenne', hm(w.avg))}
+    ${statBox('Régularité coucher', w.regBed == null ? '—' : '± ' + fmt(w.regBed), 'min')}${statBox('Régularité lever', w.regWake == null ? '—' : '± ' + fmt(w.regWake), 'min')}</div></div>
+  <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin'})}</div>
+  <p class="desc" style="text-align:center">Détection : ${n.source.toLowerCase()}. Pas de phases (léger / profond / paradoxal).</p>`;
+}
+let period = 30;
+function viewMetric(key, idx) {
+  const m = M[key], d = D.days[idx], v = val(d, key, idx), st = stats(key, idx, period), b = baseline(key, idx);
+  const seg = [7, 30, 90].map(p => `<a href="#/m/${key}/${d.date}/${p}" class="${p === period ? 'on' : ''}">${p} j</a>`).join('');
+  return navDate('m/' + key, idx, '/' + period) + `<div class="card" style="text-align:center"><div class="lbl">${m.name}</div>
+    <div class="big">${fmt(v, m.dig)}<small>${v != null ? m.unit : ''}</small></div>${deltaHtml(key, idx)}</div>
+  <div class="card"><div class="seg">${seg}</div>
+    ${st ? `<div class="stats">${statBox('Moyenne', fmt(st.avg, m.dig), m.unit)}${statBox('Min', fmt(st.min.y, m.dig), m.unit, shortDate(st.min.date))}
+      ${statBox('Max', fmt(st.max.y, m.dig), m.unit, shortDate(st.max.date))}${statBox('Plage normale', b && b.sd != null ? fmt(b.avg - b.sd, m.dig) + '–' + fmt(b.avg + b.sd, m.dig) : '—', m.unit)}</div>` : ''}
+    ${dailyChart(key, idx, period, {h: 220, ...(b && b.sd != null && m.type !== 'bar' ? {band: [b.avg - b.sd, b.avg + b.sd]} : {})})}</div>
+  <div class="card"><p class="desc">${m.desc}</p></div>`;
+}
+function viewAct(i) {
+  const a = D.acts[i];
+  if (!a) return '<div class="card empty">Activité introuvable.</div>';
+  const pts = hrBetween(epochMin(a.start), epochMin(a.end)), p = pace(a);
+  return `<div class="title"><h1>${a.name || a.type}</h1><p>${longDate(a.date)} · ${clock(a.start)} → ${clock(a.end)}</p></div>
+  <div class="card"><div class="stats" style="margin:0">${statBox('Strain', fmt(a.strain, 1))}${statBox('Durée', hm(a.dur))}${statBox('Calories', fmt(a.cal), 'kcal')}
+    ${statBox('FC moy.', fmt(a.hrAvg), 'bpm')}${statBox('FC max', fmt(a.hrMax), 'bpm')}${statBox('% FC max', fmt(a.hrMax / HRMAX * 100), '%')}${statBox('Pas', fmt(a.steps))}${statBox('Cadence', fmt(a.cadence), 'pas/min')}
+    ${a.km ? statBox('Distance', fmt(a.km, 2), 'km') + statBox(isFoot(a.sport) ? 'Allure' : 'Vitesse', p || '—') + statBox('D+', fmt(a.elev), 'm') : ''}</div></div>
+  <div class="card"><h2><span>Fréquence cardiaque</span></h2>${hrStats(pts)}${hrChart(pts, {xTicks: rangeTicks(pts), smoothWin: 1, h: 220})}</div>
+  <div class="card"><h2><span>Temps par zone cardiaque</span></h2>${zonesHtml(a.zones)}</div>`;
+}
+
+// ---------- semaine
+function weekOf(iso) { const t = new Date(iso + 'T12:00'), dow = (t.getDay() + 6) % 7; return addDays(iso, -dow); }
+function weekAgg(monday) {
+  const ds = [...Array(7)].map((_, i) => addDays(monday, i)), rows = ds.map(x => D.days[IDX[x]]).filter(Boolean);
+  const acts = D.acts.filter(a => ds.includes(a.date));
+  return {ds, rows, rec: mean(rows.map(r => r.recovery)), strain: mean(rows.map(r => r.strain)), sleep: mean(rows.map(r => r.sleep)),
+    hrv: mean(rows.map(r => r.hrv)), rhr: mean(rows.map(r => r.rhr)), steps: sum(rows.map(r => r.steps)), cal: sum(rows.map(r => r.cal)),
+    acts: acts.length, actMin: sum(acts.map(a => a.dur)), zones: [0, 1, 2, 3, 4].map(z => sum(rows.map(r => (r.zones || [])[z])))};
+}
+function viewWeek(mondayArg) {
+  const monday = mondayArg || weekOf(LAST), w = weekAgg(monday), p = weekAgg(addDays(monday, -7));
+  const prevW = D.days.some(d => d.date < monday), nextW = addDays(monday, 7) <= LAST;
+  const cmp = (k, a, b, f, better) => { const dv = a != null && b != null && b !== 0 ? (a - b) / Math.abs(b) * 100 : null;
+    const cls = dv == null || Math.abs(dv) < 3 || !better ? '' : (dv > 0) === (better === 'up') ? 'good' : 'bad';
+    return `<div class="cmp"><div>${k}</div><div class="v">${f(a)}</div><div class="delta ${cls}" style="min-width:90px;text-align:right">${dv == null ? 'sem. préc. —' : (dv >= 0 ? '▲ ' : '▼ ') + fmt(Math.abs(dv)) + ' %'}</div></div>`; };
+  const day = x => { const r = D.days[IDX[x]];
+    return `<a href="#/jour/${x}" ${r ? '' : 'style="opacity:.35;pointer-events:none"'}><div class="dn">${dayShort(x)}</div>
+      <div class="rc" style="background:${r && r.recovery != null ? recColor(r.recovery) : css('--line')}">${r && r.recovery != null ? r.recovery : ''}</div>
+      <div class="sm">${r ? fmt(r.strain, 1) : '—'}</div><div class="sm">${r && r.sleep != null ? hm(r.sleep).replace(' ', '') : '—'}</div></a>`; };
+  const sun = addDays(monday, 6);
+  return `<div class="datebar">${prevW ? `<a href="#/semaine/${addDays(monday, -7)}">‹</a>` : '<span class="dis">‹</span>'}
+    <h1>Semaine du ${shortDate(monday)} au ${shortDate(sun)}</h1>${nextW ? `<a href="#/semaine/${addDays(monday, 7)}">›</a>` : '<span class="dis">›</span>'}</div>
+  <div class="card"><h2><span>Jour par jour</span><span>recovery · strain · sommeil</span></h2><div class="week">${w.ds.map(day).join('')}</div></div>
+  <div class="card"><h2><span>Bilan de la semaine</span><span>par rapport à la semaine précédente</span></h2>
+    ${cmp('Recovery moyenne', w.rec, p.rec, v => v == null ? '—' : fmt(v) + ' %', 'up')}
+    ${cmp('Strain moyen', w.strain, p.strain, v => fmt(v, 1), null)}
+    ${cmp('Sommeil moyen', w.sleep, p.sleep, hm, 'up')}
+    ${cmp('HRV moyenne', w.hrv, p.hrv, v => v == null ? '—' : fmt(v) + ' ms', 'up')}
+    ${cmp('FC de repos moyenne', w.rhr, p.rhr, v => v == null ? '—' : fmt(v) + ' bpm', 'down')}
+    ${cmp('Pas', w.steps, p.steps, v => fmt(v), 'up')}
+    ${cmp('Calories', w.cal || null, p.cal || null, v => v == null ? '—' : fmt(v) + ' kcal', null)}
+    ${cmp('Activités', w.acts, p.acts, v => `${fmt(v)} · ${hm(w.actMin)}`, null)}</div>
+  <div class="card"><h2><span>Temps par zone cardiaque sur la semaine</span></h2>${zonesHtml(w.zones)}</div>`;
+}
+
+// ---------- tendances : calendrier, records, influences
+function calendar() {
+  const end = LAST, start = weekOf(addDays(end, -7 * 15)), cells = [];
+  for (let x = start; x <= addDays(weekOf(end), 6); x = addDays(x, 1)) {
+    const r = D.days[IDX[x]], c = r && r.recovery != null ? recColor(r.recovery) : r && r.sleep != null ? css('--line') : null;
+    cells.push(`<a href="${r ? '#/jour/' + x : 'javascript:void 0'}" title="${shortDate(x)}${r && r.recovery != null ? ' · recovery ' + r.recovery + ' %' : ''}"><i style="${c ? 'background:' + c : x > end ? 'opacity:.3' : ''}"></i></a>`);
+  }
+  return `<div class="cal">${cells.join('')}</div><div class="cal-l"><span><i style="background:${css('--green')}"></i>≥ 67 %</span>
+    <span><i style="background:${css('--yellow')}"></i>34-66 %</span><span><i style="background:${css('--red')}"></i>≤ 33 %</span><span><i style="background:${css('--line')}"></i>calibrage</span></div>`;
+}
+function records() {
+  const best = (key, dir, f) => { let b = null; D.days.forEach((d, i) => { const v = val(d, key, i); if (v != null && (b == null || (dir > 0 ? v > b.v : v < b.v))) b = {v, date: d.date}; });
+    return b ? `<a class="rec" href="#/jour/${b.date}"><div><div>${f[0]}</div><div class="s">${longDate(b.date)}</div></div><div class="v">${f[1](b.v)}</div></a>` : ''; };
+  const longAct = D.acts.reduce((a, b) => !a || b.dur > a.dur ? b : a, null);
+  return [best('hrv', 1, ['HRV la plus haute', v => fmt(v) + ' ms']), best('rhr', -1, ['FC de repos la plus basse', v => fmt(v) + ' bpm']),
+    best('sleep', 1, ['Plus longue nuit', hm]), best('recovery', 1, ['Meilleure Recovery', v => v + ' %']), best('strain', 1, ['Plus gros Strain', v => fmt(v, 1)]),
+    best('steps', 1, ['Plus de pas', v => fmt(v)]), best('hrMax', 1, ['FC la plus haute', v => fmt(v) + ' bpm']), best('vo2', 1, ['Meilleure VO2max', v => fmt(v, 1)]),
+    longAct ? `<a class="rec" href="#/act/${D.acts.indexOf(longAct)}"><div><div>Plus longue activité</div><div class="s">${longAct.name || longAct.type} · ${longDate(longAct.date)}</div></div><div class="v">${hm(longAct.dur)}</div></a>` : ''].join('')
+    || '<div class="empty">Les records apparaîtront avec tes premières données.</div>';
+}
+function influences() {
+  const pear = (xs, ys) => { const pr = xs.map((x, i) => [x, ys[i]]).filter(([x, y]) => x != null && y != null);
+    if (pr.length < 8) return {r: null, n: pr.length}; const mx = mean(pr.map(p => p[0])), my = mean(pr.map(p => p[1]));
+    const num = sum(pr.map(([x, y]) => (x - mx) * (y - my))), den = Math.sqrt(sum(pr.map(([x]) => (x - mx) ** 2)) * sum(pr.map(([, y]) => (y - my) ** 2)));
+    return {r: den ? num / den : null, n: pr.length}; };
+  const rec = D.days.map(d => d.recovery), prev = k => D.days.map((d, i) => i ? D.days[i - 1][k] : null);
+  const bed = D.days.map(d => { const n = nightOf(d.date); if (!n) return null; const t = new Date(n.start); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; });
+  const stressPrev = D.days.map((d, i) => i ? (stressOf(i - 1) || {}).avg ?? null : null);
+  const rows = [['Durée du sommeil', D.days.map(d => d.sleep), 'plus tu dors'], ['Strain de la veille', prev('strain'), 'plus la veille est intense'],
+    ['Heure de coucher', bed, 'plus tu te couches tard'], ['Pas de la veille', prev('steps'), 'plus tu marches la veille'], ['Stress de la veille', stressPrev, 'plus la veille est stressante']];
+  const res = rows.map(([k, xs, txt]) => ({k, txt, ...pear(xs, rec)}));
+  if (res.every(r => r.r == null)) return `<div class="empty">Disponible après 8 jours avec une Recovery (${Math.max(...res.map(r => r.n))}/8). L’appli calculera alors ce qui fait monter ou baisser ta Recovery.</div>`;
+  return res.map(r => r.r == null ? '' : `<div class="corr"><div>${r.k}<div class="s">${Math.abs(r.r) < .2 ? 'pas d’effet net' : `${r.txt}, ${r.r > 0 ? 'meilleure' : 'moins bonne'} est ta Recovery`}</div></div>
+    <div class="cbar"><i style="${r.r >= 0 ? `left:50%;width:${r.r * 50}%` : `left:${50 + r.r * 50}%;width:${-r.r * 50}%`};background:${r.r >= 0 ? css('--green') : css('--red')}"></i></div>
+    <div class="delta" style="text-align:right">r = ${fmt(r.r, 2)}</div></div>`).join('') + '<p class="desc" style="margin-top:8px">r va de -1 à +1 : plus il est loin de 0, plus le lien est fort (sur tes propres données).</p>';
+}
+function viewTrends() {
+  const idx = D.days.length - 1, seg = [7, 30, 90].map(p => `<a href="#/tendances/${p}" class="${p === period ? 'on' : ''}">${p} jours</a>`).join('');
+  const card = key => { const m = M[key], st = stats(key, idx, period);
+    return `<a class="card" href="#/m/${key}/${LAST}/${period}"><h2><span>${m.name} ›</span><span>${st ? `moy. <b>${fmt(st.avg, m.dig)}</b> ${m.unit} · ${fmt(st.min.y, m.dig)}–${fmt(st.max.y, m.dig)}` : ''}</span></h2>
+      ${dailyChart(key, idx, period, {h: 140, ...(key === 'sleepH' ? {ref: NEED / 60, refLabel: 'besoin'} : {})})}</a>`; };
+  return `<div class="title"><h1>Tendances</h1></div>
+  <div class="card"><h2><span>Calendrier de la Recovery</span><span>16 semaines</span></h2>${calendar()}</div>
+  <div class="card"><h2><span>Ce qui influence ta Recovery</span></h2>${influences()}</div>
+  <div class="seg">${seg}</div>
+  <div class="two">${['recovery', 'strain', 'sleepH', 'hrv', 'rhr', 'stress', 'steps', 'cal', 'vo2', 'resp', 'temp', 'spo2'].map(card).join('')}</div>
+  <div class="card" style="margin-top:12px"><h2><span>Tes records</span></h2>${records()}</div>`;
+}
+
+// ---------- navigation
+function route() {
+  charts = []; gid = 0; animate = true;
+  const [view, a, b, c] = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  if (!D.days.length) { head.innerHTML = `<div class="brand">${window.WHOOP_SERVER ? '<button class="syncb" onclick="startSync()" title="Synchroniser le bracelet">↻</button>' : ''}<span class="bt">WHOOP</span></div>`;
+    app.innerHTML = '<div class="card empty">Aucune donnée : lance une synchro avec le bouton ↻.</div>'; return; }
+  const idxOf = date => IDX[date] ?? D.days.length - 1;
+  const top = !view || ['jour', 'tendances', 'semaine'].includes(view);
+  const tab = view === 'tendances' ? 't' : view === 'semaine' ? 's' : 'j';
+  head.innerHTML = `<div class="brand">${top ? '' : '<a class="back" href="javascript:history.back()">‹</a>'}${window.WHOOP_SERVER
+    ? `<button class="syncb${syncing ? ' spin' : ''}" onclick="startSync()" title="Synchroniser le bracelet">↻</button>` : ''}<span class="bt">WHOOP</span></div>
+    <nav class="tabs"><a href="#/jour/${LAST}" class="${tab === 'j' ? 'on' : ''}">Aujourd'hui</a><a href="#/semaine" class="${tab === 's' ? 'on' : ''}">Semaine</a><a href="#/tendances/${period}" class="${tab === 't' ? 'on' : ''}">Tendances</a></nav>`;
+  let html;
+  if (view === 'recovery') html = viewRecovery(idxOf(a));
+  else if (view === 'strain') html = viewStrain(idxOf(a));
+  else if (view === 'sommeil') html = viewSleep(idxOf(a));
+  else if (view === 'stress') html = viewStress(idxOf(a));
+  else if (view === 'hr') html = viewHr(idxOf(a));
+  else if (view === 'm' && M[a]) { if (c) period = +c; html = viewMetric(a, idxOf(b)); }
+  else if (view === 'act') html = viewAct(+a);
+  else if (view === 'semaine') html = viewWeek(a);
+  else if (view === 'tendances') { if (a) period = +a; html = viewTrends(); }
+  else html = viewDay(idxOf(a));
+  app.style.animation = 'none'; app.offsetHeight; app.style.animation = '';
+  app.innerHTML = html;
+  mountCharts();
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.arc').forEach(el => el.setAttribute('stroke-dasharray', `${el.dataset.d} 999`))));
+  window.scrollTo({top: 0});
+}
+window.addEventListener('hashchange', route);
+
+// ---------- synchro depuis le téléphone (seulement via whoop_serveur.py)
+let syncing = false;
+function sheet(title, lines, show = true) {
+  let el = document.querySelector('.sheet');
+  if (!el) { el = document.createElement('div'); el.className = 'sheet'; document.body.appendChild(el); }
+  el.innerHTML = `<b>${title}</b>${(lines || []).map(l => `<div class="l">${l.replace(/[<>&]/g, '')}</div>`).join('')}`;
+  requestAnimationFrame(() => el.classList.toggle('show', show));
+}
+async function poll() {
+  try {
+    const s = await (await fetch('status', {cache: 'no-store'})).json();
+    if (s.running) { sheet('Synchronisation du bracelet…', s.lines.slice(-2)); setTimeout(poll, 1200); return; }
+    syncing = false; document.querySelector('.syncb')?.classList.remove('spin');
+    if (s.ok) { sheet('Synchro terminée ✓', ['Mise à jour de l’appli…']); setTimeout(() => location.reload(), 900); }
+    else { sheet('Bracelet introuvable', ['Garde-le près du PC (Bluetooth) et réessaie.']); setTimeout(() => sheet('', [], false), 6000); }
+  } catch (e) { syncing = false; sheet('PC injoignable', ['Vérifie que la fenêtre « Serveur WHOOP » est ouverte sur le PC.']); setTimeout(() => sheet('', [], false), 6000); }
+}
+async function startSync() {
+  if (syncing) return;
+  syncing = true; document.querySelector('.syncb')?.classList.add('spin');
+  sheet('Synchronisation du bracelet…', ['Connexion au WHOOP depuis le PC']);
+  try { await fetch('sync', {method: 'POST'}); } catch (e) {}
+  poll();
+}
+if (window.WHOOP_SERVER) fetch('status', {cache: 'no-store'}).then(r => r.json()).then(s => { if (s.running) { syncing = true; route(); poll(); } }).catch(() => {});
+
+const s = D.sync, nextSync = s.lastData ? new Date(new Date(s.lastData).getTime() + 12 * 864e5) : null;
+document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new Date(s.last).toLocaleString('fr-FR', {dateStyle: 'medium', timeStyle: 'short'})}${s.battery != null ? ' · batterie du bracelet ' + s.battery + ' %' : ''}<br>` : '')
+  + `${fmt(s.measures)} mesures · ${s.gaps === 0 ? '<span class="good">transfert complet, aucune perte</span>' : `<span class="bad">${fmt(s.gaps)} mesures manquantes</span>`}`
+  + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
+route();
+</script>
+<script>
+// iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
+// Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
+// et calculs identiques à whoop_analyse.py. Les données ne quittent jamais le téléphone.
+'use strict';
+(() => {
+const SVC = 'fd4b0001-cce1-4033-93ce-002d5875f58a', CMD = 'fd4b0002-cce1-4033-93ce-002d5875f58a';
+const NOTIF = ['fd4b0003-cce1-4033-93ce-002d5875f58a', 'fd4b0004-cce1-4033-93ce-002d5875f58a',
+  'fd4b0005-cce1-4033-93ce-002d5875f58a', 'fd4b0007-cce1-4033-93ce-002d5875f58a'];
+const PT_COMMAND = 35, PT_HISTORICAL = 47, PT_METADATA = 49;
+const LINK_VALID = 1, ABORT_HISTORICAL = 20, SEND_HISTORICAL = 22, HISTORICAL_RESULT = 23, GET_HELLO = 145,
+  ENTER_HF = 96, EXIT_HF = 97;
+
+// ---------------------------------------------------------------- trames (protocole Maverick)
+const CRC16 = [], CRC32 = [];
+for (let i = 0; i < 256; i++) {
+  let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xA001 : c >>> 1; CRC16.push(c);
+  let d = i; for (let k = 0; k < 8; k++) d = d & 1 ? (d >>> 1) ^ 0xEDB88320 : d >>> 1; CRC32.push(d >>> 0);
+}
+const crc16 = b => { let c = 0xFFFF; for (const x of b) c = CRC16[(c ^ x) & 0xFF] ^ (c >>> 8); return c & 0xFFFF; };
+const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC32[(c ^ x) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+let seq = 0;
+function encodeCmd(cmd, payload = []) {
+  seq = (seq + 1) & 0xFF;
+  const inner = [PT_COMMAND, seq, cmd, ...payload]; while (inner.length % 4) inner.push(0);
+  const len = inner.length + 4, head = [0xAA, 0x01, len & 0xFF, len >> 8, 0x00, 0x01], h = crc16(head), c = crc32(inner);
+  return new Uint8Array([...head, h & 0xFF, h >> 8, ...inner, c & 0xFF, (c >>> 8) & 0xFF, (c >>> 16) & 0xFF, c >>> 24]);
+}
+function decodeFrame(d) {
+  if (d.length < 12 || d[0] !== 0xAA) return null;
+  const len = d[2] | (d[3] << 8);
+  if (8 + len !== d.length || len < 7) return null;
+  if ((d[6] | (d[7] << 8)) !== crc16(d.subarray(0, 6))) return null;
+  const inner = d.subarray(8, 8 + len - 4), o = 8 + len - 4;
+  if (((d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | (d[o + 3] << 24)) >>> 0) !== crc32(inner)) return null;
+  return {pt: inner[0], sub: inner[1], cmd: inner[2], payload: inner.slice(3)};
+}
+class Reassembler {
+  constructor() { this.buf = new Uint8Array(0); this.dropped = 0; }
+  feed(chunk) {
+    const b = new Uint8Array(this.buf.length + chunk.length); b.set(this.buf); b.set(chunk, this.buf.length); this.buf = b;
+    const out = [];
+    for (;;) {
+      const s = this.buf.indexOf(0xAA);
+      if (s < 0) { this.dropped += this.buf.length; this.buf = new Uint8Array(0); break; }
+      this.dropped += s; this.buf = this.buf.subarray(s);
+      if (this.buf.length < 8) break;
+      const total = 8 + (this.buf[2] | (this.buf[3] << 8));
+      if (total > 4096) { this.buf = this.buf.subarray(1); this.dropped++; continue; }
+      if (this.buf.length < total) break;
+      const f = decodeFrame(this.buf.subarray(0, total));
+      if (!f) { this.buf = this.buf.subarray(1); this.dropped++; continue; }
+      out.push(f); this.buf = this.buf.subarray(total);
+    }
+    this.buf = this.buf.slice();
+    return out;
+  }
+}
+
+// ---------------------------------------------------------------- enregistrement R18 (1 par seconde)
+function decodeR18(p) {
+  if (p.length < 72) return null;
+  const v = new DataView(p.buffer, p.byteOffset, p.byteLength), rr = [];
+  for (let i = 0; i < Math.min(p[12], 4); i++) rr.push(v.getUint16(13 + 2 * i, true));
+  let mov = v.getFloat32(30, true); if (!isFinite(mov) || mov < 0 || mov >= 20) mov = null;
+  return {rid: v.getUint32(0, true), ts: v.getUint32(4, true) + v.getUint16(8, true) / 32768, hr: p[11], rr, mov,
+    steps: v.getUint16(46, true), act: p[52], etat: (p[70] >> 4) & 3, spo2: p[71], skin: v.getUint16(62, true) / 100};
+}
+
+// ---------------------------------------------------------------- stockage (IndexedDB, dans le téléphone)
+let dbp = null;
+const idb = () => dbp || (dbp = new Promise((res, rej) => {
+  const r = indexedDB.open('whoop', 1);
+  r.onupgradeneeded = () => { r.result.createObjectStore('minutes', {keyPath: 't'}); r.result.createObjectStore('kv'); };
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+}));
+const tx = async (store, mode, fn) => { const db = await idb(); return new Promise((res, rej) => {
+  const t = db.transaction(store, mode), out = fn(t.objectStore(store)); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); }); };
+const kvGet = k => tx('kv', 'readonly', s => s.get(k));
+const kvSet = (k, v) => tx('kv', 'readwrite', s => { s.put(v, k); });
+const allMinutes = () => tx('minutes', 'readonly', s => s.getAll());
+const newMin = t => ({t, n: 0, hs: 0, hc: 0, hx: 0, b: [], ms: 0, mc: 0, st: 0, a: [0, 0, 0, 0], e: [0, 0, 0, 0], o: [], ks: 0, kc: 0});
+function mergeMin(x, y) {
+  return {t: x.t, n: x.n + y.n, hs: x.hs + y.hs, hc: x.hc + y.hc, hx: Math.max(x.hx, y.hx), b: x.b.concat(y.b), ms: x.ms + y.ms,
+    mc: x.mc + y.mc, st: x.st + y.st, a: x.a.map((c, i) => c + y.a[i]), e: x.e.map((c, i) => c + y.e[i]), o: x.o.concat(y.o),
+    ks: x.ks + y.ks, kc: x.kc + y.kc};
+}
+function putMinutes(map) {
+  return tx('minutes', 'readwrite', s => { for (const m of map.values()) { const g = s.get(m.t); g.onsuccess = () => s.put(g.result ? mergeMin(g.result, m) : m); } });
+}
+const DEFAULT_STATE = {maxRid: null, lastSteps: null, lastTs: null, measures: 0, gaps: 0, syncs: []};
+async function getState() { return Object.assign({}, DEFAULT_STATE, await kvGet('state') || {}); }
+
+// Ajoute des secondes décodées : contrôle de la numérotation (trous), doublons ignorés, agrégation par minute
+function ingest(recs, state, map) {
+  let dup = 0, gaps = 0, added = 0;
+  recs.sort((a, b) => a.rid - b.rid);
+  for (const r of recs) {
+    if (state.maxRid != null && r.rid <= state.maxRid) { dup++; continue; }
+    if (state.maxRid != null && r.rid > state.maxRid + 1) gaps += r.rid - state.maxRid - 1;
+    state.maxRid = r.rid; state.measures++; added++;
+    const t = Math.floor(r.ts / 60);
+    let m = map.get(t); if (!m) map.set(t, m = newMin(t));
+    m.n++;
+    if (r.hr >= 30 && r.hr <= 220) { m.hs += r.hr; m.hc++; m.hx = Math.max(m.hx, r.hr); }
+    for (const v of r.rr) m.b.push([Math.round(r.ts * 100) / 100, v]);
+    if (r.mov != null) { m.ms += r.mov; m.mc++; }
+    m.a[Math.min(r.act, 3)]++; m.e[r.etat]++;
+    if (r.spo2 >= 70 && r.spo2 <= 100) m.o.push(r.spo2);
+    if (r.skin >= 25 && r.skin <= 42) { m.ks += r.skin; m.kc++; }
+    if (state.lastSteps != null) {  // compteur cumulatif : avance par paquets, se corrige parfois à la baisse
+      let d = r.steps - state.lastSteps; if (d < -1000) d = r.steps;
+      if (d <= 10 * Math.max(1, r.ts - state.lastTs)) m.st += d;
+    }
+    state.lastSteps = r.steps; state.lastTs = r.ts;
+  }
+  state.gaps += gaps;
+  return {dup, gaps, added};
+}
+
+// ---------------------------------------------------------------- calculs (identiques à whoop_analyse.py)
+const mean = (a, d = 1) => { a = a.filter(x => x != null); return a.length ? +(a.reduce((s, x) => s + x, 0) / a.length).toFixed(d) : null; };
+const pad = n => String(n).padStart(2, '0');
+const isoLocal = ms => { const t = new Date(ms); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`; };
+const dateLocal = ms => isoLocal(ms).slice(0, 10);
+const mode = c => c.indexOf(Math.max(...c));
+const median = a => { a = [...a].sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
+const pstdev = a => { const m = a.reduce((s, x) => s + x, 0) / a.length; return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / a.length); };
+
+function buildMinutes(raw) {
+  return raw.sort((a, b) => a.t - b.t).map(m => ({tm: m.t, n: m.n, hr: m.hc ? +(m.hs / m.hc).toFixed(1) : null, hx: m.hc ? m.hx : null,
+    beats: m.b, mov: m.mc ? +(m.ms / m.mc).toFixed(3) : null, steps: m.st, act: mode(m.a), etat: mode(m.e), spo2: m.o,
+    skin: m.kc ? +(m.ks / m.kc).toFixed(2) : null}));
+}
+function cleanBeats(beats) {
+  const out = [];
+  for (const [ts, rr] of beats) {
+    if (rr < 300 || rr > 2000) continue;
+    if (out.length && ts - out[out.length - 1][0] <= 3 && Math.abs(rr - out[out.length - 1][1]) > 0.2 * out[out.length - 1][1]) continue;
+    out.push([ts, rr]);
+  }
+  return out;
+}
+function rmssd(b) {
+  const d = []; for (let i = 1; i < b.length; i++) if (b[i][0] - b[i - 1][0] <= 3) d.push(b[i][1] - b[i - 1][1]);
+  return d.length >= 30 ? +Math.sqrt(d.reduce((s, x) => s + x * x, 0) / d.length).toFixed(1) : null;
+}
+function respRate(beats) {
+  if (beats.length < 100) return null;
+  const win = new Map(); for (const [ts, rr] of beats) { const k = Math.floor((ts - beats[0][0]) / 120); if (!win.has(k)) win.set(k, []); win.get(k).push(rr); }
+  const res = [];
+  for (const rrs of win.values()) {
+    if (rrs.reduce((s, x) => s + x, 0) / 1000 < 0.8 * 120) continue;
+    let t = 0; const times = rrs.map(r => (t += r / 1000));
+    const n = Math.floor((times[times.length - 1] - times[0]) / 0.25); if (n < 200) continue;
+    const sig = []; let j = 0;
+    for (let i = 0; i < n; i++) { const g = times[0] + i * 0.25; while (times[j + 1] < g) j++;
+      const k = (g - times[j]) / (times[j + 1] - times[j]); sig.push(rrs[j] + k * (rrs[j + 1] - rrs[j])); }
+    const m = sig.reduce((s, x) => s + x, 0) / sig.length; for (let i = 0; i < sig.length; i++) sig[i] -= m;
+    let bf = null, bp = 0;
+    for (let fi = 24; fi <= 100; fi++) { const f = fi * 0.005; let c = 0, s = 0;
+      for (let i = 0; i < sig.length; i++) { const a = 2 * Math.PI * f * i * 0.25; c += sig[i] * Math.cos(a); s += sig[i] * Math.sin(a); }
+      if (c * c + s * s > bp) { bf = f; bp = c * c + s * s; } }
+    res.push(bf * 60);
+  }
+  return res.length >= 3 ? +median(res).toFixed(1) : null;
+}
+function profilOf(p) {
+  p = Object.assign({naissance: null, sexe: null, poids: null, taille: null, fcMax: null, besoin: 8}, p || {});
+  let age = null;
+  if (p.naissance) { const b = new Date(p.naissance + 'T12:00'), n = new Date();
+    age = n.getFullYear() - b.getFullYear() - ((n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) ? 1 : 0); }
+  const hrMax = p.fcMax || (age ? Math.round(208 - 0.7 * age) : 190);
+  return {...p, age, hrMax, complete: !!(age && p.sexe && p.poids && p.taille)};
+}
+function detectSleep(mins) {
+  const strap = mins.some(m => m.etat === 2);
+  const asleep = m => strap ? m.etat === 2 : (m.mov != null && m.mov < 0.03 && m.act === 0 && m.hr != null);
+  const sessions = []; let cur = null;
+  for (const m of mins) if (asleep(m)) {
+    if (cur && m.tm - cur[cur.length - 1].tm <= 15) cur.push(m); else { cur = [m]; sessions.push(cur); }
+  }
+  const out = [];
+  for (const s of sessions) {
+    if (s.length < 20) continue;
+    const start = s[0].tm, end = s[s.length - 1].tm + 1, inBed = end - start;
+    const gaps = []; for (let i = 1; i < s.length; i++) if (s[i].tm - s[i - 1].tm >= 3) gaps.push([s[i - 1].tm + 1, s[i].tm]);
+    const hrs = s.map(m => m.hr).filter(x => x != null), roll = [];
+    for (let i = 0; i + 5 <= hrs.length; i++) roll.push(hrs.slice(i, i + 5).reduce((a, b) => a + b, 0) / 5);
+    const beats = cleanBeats(s.flatMap(m => m.beats).sort((a, b) => a[0] - b[0])), spo2 = s.flatMap(m => m.spo2);
+    const midH = new Date((start + inBed / 2) * 60000).getHours();
+    out.push({date: dateLocal(end * 60000), type: s.length >= 180 || midH >= 20 || midH < 10 ? 'Nuit' : 'Sieste',
+      startTm: start, endTm: end, start: isoLocal(start * 60000), end: isoLocal(end * 60000), inbed: inBed, asleep: s.length,
+      eff: inBed ? s.length / inBed : null, wakes: gaps.length, hrAvg: mean(hrs), hrMin: roll.length ? +Math.min(...roll).toFixed(1) : (hrs.length ? Math.min(...hrs) : null),
+      hrv: rmssd(beats), resp: respRate(beats), spo2: spo2.length ? +median(spo2).toFixed(1) : null, temp: mean(s.map(m => m.skin), 2),
+      source: strap ? 'État du bracelet' : 'Estimation (mouvement)', wakeSegs: gaps.map(([a, b]) => [isoLocal(a * 60000), isoLocal(b * 60000)])});
+  }
+  return out;
+}
+function effort(mins, P) {
+  const z = [0, 0, 0, 0, 0]; let cal = 0, bmr = null;
+  if (P.complete) bmr = 10 * P.poids + 6.25 * P.taille - 5 * P.age + (String(P.sexe).toUpperCase().startsWith('H') ? 5 : -161);
+  for (const m of mins) {
+    const hr = m.hr;
+    if (hr != null && hr / P.hrMax >= 0.5) z[Math.min(4, Math.floor((hr / P.hrMax - 0.5) * 10))]++;
+    if (bmr) {
+      if (hr != null && hr >= 0.5 * P.hrMax) cal += Math.max(0, String(P.sexe).toUpperCase().startsWith('H')
+        ? (-55.0969 + 0.6309 * hr + 0.1988 * P.poids + 0.2017 * P.age) / 4.184 : (-20.4022 + 0.4472 * hr - 0.1263 * P.poids + 0.074 * P.age) / 4.184);
+      else cal += bmr / 1440;
+    }
+  }
+  const trimp = z.reduce((s, x, i) => s + x * (i + 1), 0);
+  return {zones: z, trimp, strain: +(21 * (1 - Math.exp(-trimp / 250))).toFixed(1), cal: bmr ? Math.round(cal) : null};
+}
+function detectActivities(mins, sleeps, P) {
+  const asleep = new Set(); for (const s of sleeps) for (let t = s.startTm; t < s.endTm; t++) asleep.add(t);
+  const blocks = []; let cur = null;
+  for (const m of mins) {
+    if (asleep.has(m.tm) || !((m.hr || 0) >= 0.55 * P.hrMax || m.act === 2)) continue;
+    if (cur && m.tm - cur[cur.length - 1].tm <= 4) cur.push(m); else { cur = [m]; blocks.push(cur); }
+  }
+  const out = [];
+  for (const b of blocks) {
+    const start = b[0].tm, end = b[b.length - 1].tm + 1, dur = end - start, hrAvg = mean(b.map(m => m.hr));
+    const run = b.filter(m => m.act === 2).length / b.length, walk = b.filter(m => m.act === 1).length / b.length;
+    if (dur < 10 || !hrAvg || (hrAvg < 0.6 * P.hrMax && run < 0.5)) continue;
+    const steps = b.reduce((s, m) => s + m.steps, 0);
+    const type = run >= 0.5 ? 'Course' : walk >= 0.5 && hrAvg < 0.65 * P.hrMax ? 'Marche rapide' : steps / dur < 20 ? 'Vélo / muscu / autre' : 'Cardio / sport';
+    const e = effort(b, P);
+    out.push({date: dateLocal(start * 60000), type, start: isoLocal(start * 60000), end: isoLocal(end * 60000), dur, strain: e.strain,
+      hrAvg, hrMax: Math.max(...b.map(m => m.hx || 0)) || null, zones: e.zones, cal: e.cal, steps, cadence: Math.round(steps / dur)});
+  }
+  return out;
+}
+function compute(raw, state, profil) {
+  const P = profilOf(profil), mins = buildMinutes(raw), sleeps = detectSleep(mins), acts = detectActivities(mins, sleeps, P);
+  const byDay = new Map(); for (const m of mins) { const d = dateLocal(m.tm * 60000); if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(m); }
+  const nights = {}; for (const s of sleeps) if (s.type === 'Nuit' && (!nights[s.date] || s.asleep > nights[s.date].asleep)) nights[s.date] = s;
+  const days = [], hist = [];
+  for (const [d, ms] of [...byDay.entries()].sort()) {
+    const e = effort(ms, P), n = nights[d] || null, a = acts.filter(x => x.date === d), secs = ms.reduce((s, m) => s + m.n, 0);
+    const base = hist.filter(h => h.hrv && h.hrMin).slice(-30);
+    let recovery = null;
+    if (n && n.hrv && n.hrMin && base.length >= 4) {
+      const ln = base.map(h => Math.log(h.hrv)), rhr = base.map(h => h.hrMin);
+      const zh = (Math.log(n.hrv) - ln.reduce((s, x) => s + x, 0) / ln.length) / Math.max(pstdev(ln), 0.10);
+      const zr = (n.hrMin - rhr.reduce((s, x) => s + x, 0) / rhr.length) / Math.max(pstdev(rhr), 2.5);
+      const need = P.besoin || 8, sf = Math.max(-1, Math.min(1, (n.asleep / 60 - 0.875 * need) / (0.1875 * need)));
+      recovery = Math.max(1, Math.min(99, Math.round(50 + 22 * zh - 14 * zr + 8 * sf)));
+    }
+    const temps = hist.filter(h => h.temp).slice(-14).map(h => h.temp);
+    const dtemp = n && n.temp && temps.length >= 3 ? +(n.temp - temps.reduce((s, x) => s + x, 0) / temps.length).toFixed(2) : null;
+    if (n) hist.push(n);
+    const rest7 = hist.filter(h => h.hrMin).slice(-7).map(h => h.hrMin), vMax = P.fcMax || (P.age ? Math.round(208 - 0.7 * P.age) : null);
+    days.push({date: d, recovery, calibrage: base.length, hrv: n && n.hrv, rhr: n && n.hrMin, sleep: n && n.asleep, inbed: n && n.inbed,
+      eff: n && n.eff, wakes: n && n.wakes, resp: n && n.resp, spo2: n && n.spo2, temp: n && n.temp, dtemp, strain: e.strain, trimp: e.trimp,
+      steps: ms.reduce((s, m) => s + m.steps, 0), active: ms.filter(m => m.act >= 1).length, zones: e.zones, hrAvg: mean(ms.map(m => m.hr)),
+      hrMax: Math.max(0, ...ms.map(m => m.hx || 0)) || null, cal: e.cal,
+      vo2: vMax && rest7.length >= 3 ? +(15.3 * vMax / (rest7.reduce((s, x) => s + x, 0) / rest7.length)).toFixed(1) : null,
+      hours: +(secs / 3600).toFixed(2), nbAct: a.length});
+  }
+  const curves = {}, cutoff = mins.length ? mins[mins.length - 1].tm - 90 * 1440 : 0;
+  for (const m of mins) if (m.tm >= cutoff && (m.hr != null || m.steps > 0)) {
+    const t = new Date(m.tm * 60000), d = dateLocal(m.tm * 60000);
+    (curves[d] = curves[d] || []).push(t.getHours() * 60 + t.getMinutes(), Math.round(m.hr || 0), Math.max(0, m.steps));
+  }
+  const last = state.syncs.length ? state.syncs[state.syncs.length - 1] : null;
+  return {days, sleeps, acts, curves, profile: {sleepNeed: P.besoin || 8, hrMax: P.hrMax, complete: P.complete, age: P.age},
+    sync: {measures: state.measures, gaps: state.gaps, last: last && last.date, battery: last && last.battery,
+      lastData: state.lastTs ? isoLocal(state.lastTs * 1000) : null}};
+}
+
+// ---------------------------------------------------------------- synchro Bluetooth directe
+async function syncBracelet(log) {
+  if (!navigator.bluetooth) throw new Error('Bluetooth indisponible : ouvre cette page dans l’app Bluefy.');
+  log('Choisis ton WHOOP dans la liste…');
+  const device = await navigator.bluetooth.requestDevice({filters: [{namePrefix: 'WHOOP'}], optionalServices: [SVC, 'battery_service']});
+  log('Connexion au bracelet…');
+  const server = await device.gatt.connect();
+  let battery = null;
+  try { battery = (await (await (await server.getPrimaryService('battery_service')).getCharacteristic('battery_level')).readValue()).getUint8(0); } catch (e) {}
+  const svc = await server.getPrimaryService(SVC), cmd = await svc.getCharacteristic(CMD);
+  const state = await getState(), map = new Map(), pending = [], acks = [];
+  let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0};
+  const asm = NOTIF.map(() => new Reassembler());
+  const onFrame = f => {
+    if (f.pt === PT_HISTORICAL) { chunks++; last = Date.now(); if (f.sub === 18) { const r = decodeR18(f.payload); if (r) pending.push(r); } }
+    else if (f.pt === PT_METADATA) {
+      last = Date.now();
+      const kind = [1, 2, 3].includes(f.cmd) ? f.cmd : f.payload[0];
+      if (kind === 2 && f.payload.length >= 18) acks.push(Array.from(f.payload.slice(10, 18)));
+      else if (kind === 3) complete = true;
+    }
+  };
+  let subscribed = 0;
+  for (let i = 0; i < NOTIF.length; i++) {
+    try {
+      const c = await svc.getCharacteristic(NOTIF[i]);
+      c.addEventListener('characteristicvaluechanged', e => { const v = e.target.value; asm[i].feed(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)).forEach(onFrame); });
+      await c.startNotifications(); subscribed++;
+    } catch (e) { log('Canal ' + (i + 1) + ' refusé : ' + e.message); }
+  }
+  if (!subscribed) { server.disconnect(); throw new Error('Le bracelet refuse l’accès à sa mémoire : mets-le en mode appairage (lumière bleue) et réessaie.'); }
+  const send = async (c, p) => { const b = encodeCmd(c, p); cmd.writeValueWithResponse ? await cmd.writeValueWithResponse(b) : await cmd.writeValue(b); };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const flush = async () => {  // on enregistre dans le téléphone AVANT de confirmer au bracelet
+    if (pending.length) { const s = ingest(pending.splice(0), state, map); stats.dup += s.dup; stats.gaps += s.gaps; stats.added += s.added; }
+    if (map.size) { await putMinutes(map); map.clear(); await kvSet('state', state); }
+  };
+  try {
+    log('Lecture de la mémoire du bracelet…');
+    await send(GET_HELLO); await sleep(1000); await send(LINK_VALID); await send(ENTER_HF); await sleep(500); await send(SEND_HISTORICAL);
+    last = Date.now(); const started = Date.now(); let keep = Date.now();
+    while (!complete) {
+      if (acks.length) { const a = acks.shift(); await flush(); await send(HISTORICAL_RESULT, [1, ...a]); log(`${chunks} blocs reçus…`); }
+      else await sleep(250);
+      if (Date.now() - keep > 5000) { await send(LINK_VALID); keep = Date.now(); }
+      if (Date.now() - last > 30000 || Date.now() - started > 30 * 60000) break;
+    }
+  } finally {
+    await flush();
+    for (const c of [ABORT_HISTORICAL, EXIT_HF]) { try { await send(c); } catch (e) {} }
+    dropped = asm.reduce((s, a) => s + a.dropped, 0);
+    state.syncs.push({date: isoLocal(Date.now()), recus: chunks, nouveaux: stats.added, doublons: stats.dup, trous: stats.gaps,
+      complet: complete, rejetes: dropped, battery});
+    state.syncs = state.syncs.slice(-200);
+    await kvSet('state', state);
+    try { server.disconnect(); } catch (e) {}
+  }
+  return {complete, ...stats, battery};
+}
+
+// ---------------------------------------------------------------- import / export / réglages
+async function importFile(file) {
+  const data = JSON.parse(await file.text());
+  if (!data.minutes || !data.state) throw new Error('Fichier non reconnu.');
+  const map = new Map(); for (const m of data.minutes) map.set(m.t, m);
+  await tx('minutes', 'readwrite', s => s.clear());
+  await putMinutes(map);
+  await kvSet('state', Object.assign({}, DEFAULT_STATE, data.state));
+  if (data.profil) await kvSet('profil', data.profil);
+  return data.minutes.length;
+}
+async function exportData() {
+  const blob = new Blob([JSON.stringify({version: 1, minutes: await allMinutes(), state: await getState(), profil: await kvGet('profil')})], {type: 'application/json'});
+  const name = `whoop_sauvegarde_${dateLocal(Date.now())}.json`, file = new File([blob], name, {type: 'application/json'});
+  if (navigator.canShare && navigator.canShare({files: [file]})) return navigator.share({files: [file], title: name});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+}
+function settings() {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:grid;place-items:end center';
+  kvGet('profil').then(p => {
+    p = p || {};
+    const f = (k, label, type, extra = '') => `<label style="display:block;margin:10px 0 4px;font-size:12px;color:var(--muted)">${label}</label>
+      <input data-k="${k}" type="${type}" value="${p[k] ?? ''}" ${extra} style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit">`;
+    const btn = (id, label, primary) => `<button id="${id}" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:${primary ? '0' : '1px solid var(--line)'};
+      background:${primary ? 'var(--fg)' : 'var(--card)'};color:${primary ? 'var(--bg)' : 'var(--fg)'};font:inherit;font-weight:600">${label}</button>`;
+    el.innerHTML = `<div style="background:var(--card);width:min(520px,100%);max-height:90vh;overflow:auto;border-radius:20px 20px 0 0;padding:20px 18px max(24px,env(safe-area-inset-bottom))">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">Réglages</b><button id="x" class="syncb">✕</button></div>
+      ${f('naissance', 'Date de naissance', 'date')}${f('sexe', 'Sexe (H ou F)', 'text', 'maxlength="1"')}${f('poids', 'Poids (kg)', 'number', 'step="0.1"')}
+      ${f('taille', 'Taille (cm)', 'number')}${f('fcMax', 'FC max (bpm, laisser vide si inconnue)', 'number')}${f('besoin', 'Besoin de sommeil (heures)', 'number', 'step="0.25"')}
+      ${btn('save', 'Enregistrer', true)}
+      <p style="font-size:12px;color:var(--muted);margin:18px 0 0">Tes données sont stockées uniquement dans ce téléphone. Fais une sauvegarde de temps en temps.</p>
+      ${btn('exp', 'Sauvegarder mes données (fichier)')}${btn('imp', 'Importer un fichier (PC ou sauvegarde)')}
+      <input id="file" type="file" accept=".json,application/json" style="display:none"><p id="msg" style="font-size:13px;margin-top:10px"></p></div>`;
+    const msg = t => el.querySelector('#msg').textContent = t;
+    el.querySelector('#x').onclick = () => el.remove();
+    el.querySelector('#save').onclick = async () => {
+      const o = {}; el.querySelectorAll('input[data-k]').forEach(i => { const v = i.value.trim(); o[i.dataset.k] = v === '' ? null : i.type === 'number' ? +v : v; });
+      if (o.sexe) o.sexe = o.sexe.toUpperCase(); await kvSet('profil', o); location.reload(); };
+    el.querySelector('#exp').onclick = () => exportData().catch(e => msg('Sauvegarde impossible : ' + e.message));
+    el.querySelector('#imp').onclick = () => el.querySelector('#file').click();
+    el.querySelector('#file').onchange = async e => { try { msg('Import en cours…'); const n = await importFile(e.target.files[0]); msg(n + ' minutes importées.'); setTimeout(() => location.reload(), 700); }
+      catch (err) { msg('Import impossible : ' + err.message); } };
+  });
+  document.body.appendChild(el);
+}
+
+// ---------------------------------------------------------------- démarrage
+async function start() {
+  const state = await getState(), raw = await allMinutes(), profil = await kvGet('profil');
+  window.D_DATA = compute(raw, state, profil);
+  window.WHOOP_SERVER = true;  // affiche le bouton ↻ de l'interface
+  const ui = document.getElementById('ui'), s = document.createElement('script');
+  s.textContent = ui.textContent; document.body.appendChild(s);
+  window.startSync = async () => {
+    if (window.__syncing) return; window.__syncing = true;
+    document.querySelector('.syncb') && document.querySelector('.syncb').classList.add('spin');
+    try {
+      const r = await syncBracelet(t => window.sheet('Synchronisation du bracelet…', [t]));
+      window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`]);
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+      window.__syncing = false; document.querySelector('.syncb') && document.querySelector('.syncb').classList.remove('spin');
+      window.sheet('Synchro impossible', [e.message]); setTimeout(() => window.sheet('', [], false), 8000);
+    }
+  };
+  const foot = document.getElementById('foot'), a = document.createElement('a');
+  a.textContent = 'Réglages · sauvegarde · import'; a.href = 'javascript:void 0'; a.style.cssText = 'display:inline-block;margin-top:10px;text-decoration:underline';
+  a.onclick = settings; foot.appendChild(document.createElement('br')); foot.appendChild(a);
+  if (!raw.length) settings();
+}
+window.WHOOP_ENGINE = {decodeR18, decodeFrame, encodeCmd, Reassembler, ingest, compute, newMin, start, DEFAULT_STATE};
+if (!window.WHOOP_TEST) start().catch(e => { document.getElementById('app').innerHTML = '<div class="card">Erreur au démarrage : ' + e.message + '</div>'; });
+})();
+
+</script>
+</body>
+</html>
