@@ -778,6 +778,7 @@ document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new D
   + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
 route();
 </script>
+<script>window.WHOOP_VERSION='28/10/2026 12:01'</script>
 <script>
 // iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
 // Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
@@ -1300,6 +1301,7 @@ async function start() {
   const foot = document.getElementById('foot'), a = document.createElement('a');
   a.textContent = 'Réglages · sauvegarde · import'; a.href = 'javascript:void 0'; a.style.cssText = 'display:inline-block;margin-top:10px;text-decoration:underline';
   a.onclick = settings; foot.appendChild(document.createElement('br')); foot.appendChild(a);
+  if (window.WHOOP_VERSION) foot.appendChild(Object.assign(document.createElement('div'), {textContent: 'version ' + window.WHOOP_VERSION, style: 'opacity:.6'}));
   if (!raw.length) settings();
 }
 window.WHOOP_ENGINE = {decodeR18, decodeFrame, encodeCmd, Reassembler, ingest, compute, newMin, start, DEFAULT_STATE,
