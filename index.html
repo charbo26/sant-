@@ -455,6 +455,8 @@ function viewDay(idx) {
     <a class="ring" href="#/sommeil/${d.date}">${ring((sleepPct || 0) / 100, css('--violet'), sleepPct == null ? '—' : sleepPct + ' %', d.sleep == null ? '' : hm(d.sleep))}<div class="lbl">Sommeil</div><div class="sub">${d.sleep == null ? 'pas de nuit' : 'de ton besoin'}</div></a>
   </div>
   ${ins.out.length ? `<div class="card"><h2><span>Bilan du jour</span></h2>${ins.out.map(i => `<div class="insight"><span class="ic" style="background:${i.color}">${i.icon}</span><div>${i.text}</div></div>`).join('')}</div>` : ''}
+  ${(a => a ? `<a class="card" href="#/age"><h2><span>Âge physiologique ›</span><span>${a.days < 30 ? 'provisoire' : '30 derniers jours'}</span></h2>
+    <div style="display:flex;align-items:baseline;gap:10px"><span class="big" style="font-size:34px">${fmt(a.bio, 1)}</span><span class="delta ${a.diff < 0 ? 'good' : a.diff > 0 ? 'bad' : ''}">ans · ${a.diff < 0 ? fmt(-a.diff, 1) + ' ans de moins' : a.diff > 0 ? fmt(a.diff, 1) + ' ans de plus' : 'égal'} que ton âge réel (${a.real})</span></div></a>` : '')(bioAge())}
   <div class="grid">${['hrv', 'rhr', 'stress', 'resp', 'spo2', 'temp', 'vo2', 'steps'].map(k => tile(k, idx)).join('')}</div>
   <a class="card" href="#/hr/${d.date}"><h2><span>Fréquence cardiaque ›</span><span>sommeil en violet · activités en bleu</span></h2>${hrStats(hr)}${hrChart(hr, {x0: 0, x1: 1440, regions: dayRegions(d.date), xTicks: hourTicks, h: 180})}</a>
   <div class="two">
@@ -582,6 +584,50 @@ function viewAct(i) {
   <div class="card"><h2><span>Temps par zone cardiaque</span></h2>${zonesHtml(a.zones)}</div>`;
 }
 
+// ---------- âge physiologique (inspiré du « WHOOP Age » : 8 habitudes sur les 30 derniers jours)
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function bioAge() {
+  const P = D.profile; if (!P.age || D.days.length < 3) return null;
+  const male = !P.sex || String(P.sex).toUpperCase().startsWith('H'), days = D.days.slice(-30), n = days.length;
+  const nights = days.map(d => nightOf(d.date)).filter(Boolean), f = [];
+  const add = (name, value, delta, advice) => f.push({name, value, delta: Math.abs(delta) < 0.05 ? 0 : +delta.toFixed(2), advice});
+  const vo2 = [...days].reverse().find(d => d.vo2 != null)?.vo2;
+  if (vo2) { const norm = male ? 47 - 0.33 * (P.age - 20) : 41 - 0.30 * (P.age - 20);
+    add('VO2max', `${fmt(vo2, 1)} ml/kg/min (moyenne de ton âge : ${fmt(norm, 0)})`, clamp((norm - vo2) * 0.3, -4, 4), 'Endurance : course, vélo, natation 2-3 fois par semaine.'); }
+  const rhr = mean(days.map(d => d.rhr));
+  if (rhr) add('FC de repos', `${fmt(rhr)} bpm en moyenne`, clamp((rhr - 62) * 0.15, -3, 3), 'Elle baisse avec l’endurance, le sommeil et moins d’alcool.');
+  if (nights.length >= 3) {
+    const h = mean(nights.map(x => x.asleep)) / 60;
+    add('Durée du sommeil', `${hm(h * 60)} par nuit`, h < 7 ? clamp((7 - h) * 0.6, 0, 3) : h > 9 ? clamp((h - 9) * 0.3, 0, 1.5) : -0.5, 'Vise 7 à 9 h par nuit.');
+    const tod = iso => { const t = new Date(iso); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; };
+    const sdb = sd(nights.map(x => tod(x.start)));
+    if (sdb != null) add('Régularité du sommeil', `coucher à ± ${fmt(sdb)} min`, clamp((sdb - 45) / 30 * 0.5, -1, 1.5), 'Couche-toi et lève-toi à heures fixes, même le week-end.');
+  }
+  const full = days.filter(d => d.hours >= 12);
+  if (full.length) { const st = mean(full.map(d => d.steps));
+    add('Pas par jour', `${fmt(st)} en moyenne`, clamp((8000 - st) / 2000 * 0.5, -1.5, 2), 'Vise au moins 8 000 pas par jour.'); }
+  const wk = z => sum(days.map(d => sum((d.zones || []).slice(z[0], z[1])))) * 7 / n;
+  const mod = wk([0, 3]), vig = wk([3, 5]);
+  add('Effort modéré (zones 1-3)', `${hm(mod)} par semaine (objectif 2 h 30)`, clamp((150 - mod) / 150 * 1.2, -1.2, 1.2), '150 min par semaine d’effort modéré (marche rapide, footing léger).');
+  add('Effort intense (zones 4-5)', `${hm(vig)} par semaine (objectif 1 h 15)`, clamp((75 - vig) / 75 * 0.8, -1, 0.8), '75 min par semaine d’effort intense (fractionné, sport collectif).');
+  const total = sum(f.map(x => x.delta));
+  return {real: P.age, bio: +(P.age + total).toFixed(1), diff: +total.toFixed(1), factors: f.sort((a, b) => b.delta - a.delta), days: n};
+}
+function viewAge() {
+  const a = bioAge();
+  if (!a) return `<div class="title"><h1>Âge physiologique</h1></div><div class="card empty">Il faut ta date de naissance (profil) et au moins 3 jours de données.</div>`;
+  const younger = a.diff < 0, maxD = Math.max(1, ...a.factors.map(x => Math.abs(x.delta)));
+  return `<div class="title"><h1>Âge physiologique</h1><p>basé sur tes ${a.days} derniers jours${a.days < 30 ? ' · estimation provisoire, fiable après 30 jours' : ''}</p></div>
+  <div class="card" style="text-align:center"><div class="big">${fmt(a.bio, 1)}<small>ans</small></div>
+    <p class="verdict">Âge réel : ${a.real} ans · <b class="${younger ? 'good' : a.diff > 0 ? 'bad' : ''}">${younger ? fmt(-a.diff, 1) + ' ans plus jeune' : a.diff > 0 ? fmt(a.diff, 1) + ' ans plus vieux' : 'égal à ton âge'}</b></p></div>
+  <div class="card"><h2><span>Ce qui te rajeunit ou te vieillit</span><span>en années</span></h2>
+    ${a.factors.map(x => `<div class="contrib"><div><div class="t">${x.name}</div><div class="s">${x.value}</div></div>
+      <div class="r ${x.delta < -0.05 ? 'good' : x.delta > 0.05 ? 'bad' : ''}">${x.delta > 0 ? '+' : ''}${fmt(x.delta, 1)} an${Math.abs(x.delta) >= 2 ? 's' : ''}</div>
+      <div class="cbar" style="grid-column:1/3;margin-top:6px"><i style="${x.delta >= 0 ? `left:50%;width:${x.delta / maxD * 50}%` : `left:${50 + x.delta / maxD * 50}%;width:${-x.delta / maxD * 50}%`};background:${x.delta >= 0 ? css('--red') : css('--green')}"></i></div>
+      ${x.delta > 0.05 ? `<div class="s" style="grid-column:1/3;margin-top:4px">→ ${x.advice}</div>` : ''}</div>`).join('')}</div>
+  <div class="card"><p class="desc">Estimation maison inspirée du « WHOOP Age » : même famille d’habitudes (sommeil, régularité, pas, temps en zones cardiaques, VO2max, FC de repos), comparées aux recommandations de santé et aux moyennes de ton âge. Ce n’est pas un diagnostic médical ; c’est son évolution qui compte.</p></div>`;
+}
+
 // ---------- semaine
 function weekOf(iso) { const t = new Date(iso + 'T12:00'), dow = (t.getDay() + 6) % 7; return addDays(iso, -dow); }
 function weekAgg(monday) {
@@ -658,7 +704,9 @@ function viewTrends() {
   const card = key => { const m = M[key], st = stats(key, idx, period);
     return `<a class="card" href="#/m/${key}/${LAST}/${period}"><h2><span>${m.name} ›</span><span>${st ? `moy. <b>${fmt(st.avg, m.dig)}</b> ${m.unit} · ${fmt(st.min.y, m.dig)}–${fmt(st.max.y, m.dig)}` : ''}</span></h2>
       ${dailyChart(key, idx, period, {h: 140, ...(key === 'sleepH' ? {ref: NEED / 60, refLabel: 'besoin'} : {})})}</a>`; };
+  const ag = bioAge();
   return `<div class="title"><h1>Tendances</h1></div>
+  ${ag ? `<a class="card" href="#/age"><h2><span>Âge physiologique ›</span><span>âge réel ${ag.real} ans</span></h2><div class="big" style="font-size:34px;text-align:left">${fmt(ag.bio, 1)}<small>ans</small></div></a>` : ''}
   <div class="card"><h2><span>Calendrier de la Recovery</span><span>16 semaines</span></h2>${calendar()}</div>
   <div class="card"><h2><span>Ce qui influence ta Recovery</span></h2>${influences()}</div>
   <div class="seg">${seg}</div>
@@ -687,6 +735,7 @@ function route() {
   else if (view === 'm' && M[a]) { if (c) period = +c; html = viewMetric(a, idxOf(b)); }
   else if (view === 'act') html = viewAct(+a);
   else if (view === 'semaine') html = viewWeek(a);
+  else if (view === 'age') html = viewAge();
   else if (view === 'tendances') { if (a) period = +a; html = viewTrends(); }
   else html = viewDay(idxOf(a));
   app.style.animation = 'none'; app.offsetHeight; app.style.animation = '';
@@ -996,7 +1045,7 @@ function compute(raw, state, profil) {
     (curves[d] = curves[d] || []).push(t.getHours() * 60 + t.getMinutes(), Math.round(m.hr || 0), Math.max(0, m.steps));
   }
   const last = state.syncs.length ? state.syncs[state.syncs.length - 1] : null;
-  return {days, sleeps, acts, curves, profile: {sleepNeed: P.besoin || 8, hrMax: P.hrMax, complete: P.complete, age: P.age},
+  return {days, sleeps, acts, curves, profile: {sleepNeed: P.besoin || 8, hrMax: P.hrMax, complete: P.complete, age: P.age, sex: P.sexe},
     sync: {measures: state.measures, gaps: state.gaps, last: last && last.date, battery: last && last.battery,
       lastData: state.lastTs ? isoLocal(state.lastTs * 1000) : null}};
 }
@@ -1061,45 +1110,158 @@ async function syncBracelet(log) {
   return {complete, ...stats, battery};
 }
 
+// ---------------------------------------------------------------- format compact + compression
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+function packBeats(t, b) {  // battements : décalage (centièmes de s dans la minute) + RR (ms), 4 octets chacun
+  const u = new Uint16Array(b.length * 2);
+  b.forEach(([ts, rr], i) => { u[2 * i] = Math.max(0, Math.min(65535, Math.round((ts - t * 60) * 100))); u[2 * i + 1] = rr; });
+  return b64(new Uint8Array(u.buffer));
+}
+function unpackBeats(t, s) {
+  const by = unb64(s), u = new Uint16Array(by.buffer.slice(by.byteOffset, by.byteOffset + by.length)), out = [];
+  for (let i = 0; i < u.length; i += 2) out.push([Math.round((t * 60 + u[i] / 100) * 100) / 100, u[i + 1]]);
+  return out;
+}
+const packMin = m => [m.t, m.n, m.hs, m.hc, m.hx, +m.ms.toFixed(3), m.mc, m.st, m.a, m.e, m.o, +m.ks.toFixed(2), m.kc, m.b.length ? packBeats(m.t, m.b) : ''];
+const unpackMin = ([t, n, hs, hc, hx, ms, mc, st, a, e, o, ks, kc, bb]) => ({t, n, hs, hc, hx, ms, mc, st, a, e, o, ks, kc, b: bb ? unpackBeats(t, bb) : []});
+async function gzip(str) {
+  if (!window.CompressionStream) return {bytes: new TextEncoder().encode(str), gz: false};
+  return {bytes: new Uint8Array(await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()), gz: true};
+}
+const gunzip = u8 => new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+function byDayMinutes(all, sinceT = -Infinity) {
+  const days = new Map();
+  for (const m of all) if (m.t >= sinceT) { const d = dateLocal(m.t * 60000); if (!days.has(d)) days.set(d, []); days.get(d).push(m); }
+  return days;
+}
+
+// ---------------------------------------------------------------- sauvegarde automatique (dépôt GitHub privé)
+async function gh(cfg, path, opts = {}) {
+  return fetch(`https://api.github.com/repos/${cfg.repo}/${path}`, {...opts, cache: 'no-store',
+    headers: {Authorization: 'Bearer ' + cfg.token, Accept: 'application/vnd.github+json', ...(opts.headers || {})}});
+}
+async function ghPut(cfg, shas, path, bytes, message) {
+  const put = sha => gh(cfg, 'contents/' + path, {method: 'PUT', body: JSON.stringify({message, content: b64(bytes), ...(sha ? {sha} : {})})});
+  let r = await put(shas[path]);
+  if (r.status === 409 || r.status === 422) {  // empreinte inconnue ou périmée : on la relit puis on réessaie
+    const g = await gh(cfg, 'contents/' + path);
+    r = await put(g.ok ? (await g.json()).sha : undefined);
+  }
+  if (!r.ok) throw new Error(r.status === 401 ? 'clé d’accès GitHub refusée ou expirée' : r.status === 404 ? 'dépôt introuvable (vérifie le nom)' : 'GitHub ' + r.status);
+  shas[path] = (await r.json()).content.sha;
+}
+async function backupGitHub(log = () => {}, full = false) {
+  const cfg = await kvGet('backup'); if (!cfg || !cfg.token || !cfg.repo) return null;
+  const all = await allMinutes(), shas = (await kvGet('shas')) || {};
+  const since = full || !cfg.lastT ? -Infinity : cfg.lastT - 1440;  // jours modifiés depuis la dernière sauvegarde
+  const days = byDayMinutes(all, since);
+  let i = 0, bytesTotal = 0;
+  for (const [d, mins] of days) {
+    const day = all.filter(m => dateLocal(m.t * 60000) === d);
+    const {bytes, gz} = await gzip(JSON.stringify({v: 1, date: d, minutes: day.map(packMin)}));
+    log(`Sauvegarde ${++i}/${days.size} (${d})`);
+    await ghPut(cfg, shas, `jours/${d.slice(0, 4)}/${d}.json${gz ? '.gz' : ''}`, bytes, 'Sauvegarde ' + d);
+    bytesTotal += bytes.length;
+  }
+  await ghPut(cfg, shas, 'etat.json', new TextEncoder().encode(JSON.stringify({state: await getState(), profil: await kvGet('profil')})), 'État');
+  await kvSet('shas', shas);
+  const lastT = all.reduce((x, m) => Math.max(x, m.t), 0);
+  await kvSet('backup', {...cfg, last: isoLocal(Date.now()), lastT, lastSize: bytesTotal});
+  return {days: days.size, bytes: bytesTotal};
+}
+async function restoreGitHub(log) {
+  const cfg = await kvGet('backup'); if (!cfg) throw new Error('configure d’abord la sauvegarde GitHub');
+  const t = await gh(cfg, 'git/trees/HEAD?recursive=1');
+  if (!t.ok) throw new Error('GitHub ' + t.status);
+  const files = (await t.json()).tree.filter(x => x.type === 'blob' && x.path.startsWith('jours/')).map(x => x.path);
+  const map = new Map(); let i = 0;
+  for (const p of files) {
+    log(`Restauration ${++i}/${files.length}`);
+    const r = await gh(cfg, 'contents/' + p, {headers: {Accept: 'application/vnd.github.raw'}});
+    const u8 = new Uint8Array(await r.arrayBuffer()), txt = p.endsWith('.gz') ? await gunzip(u8) : new TextDecoder().decode(u8);
+    for (const x of JSON.parse(txt).minutes) map.set(x[0], unpackMin(x));
+  }
+  const e = await gh(cfg, 'contents/etat.json', {headers: {Accept: 'application/vnd.github.raw'}});
+  const etat = e.ok ? await e.json() : {};
+  await tx('minutes', 'readwrite', s => s.clear());
+  await tx('minutes', 'readwrite', s => { for (const m of map.values()) s.put(m); });
+  if (etat.state) await kvSet('state', Object.assign({}, DEFAULT_STATE, etat.state));
+  if (etat.profil) await kvSet('profil', etat.profil);
+  return map.size;
+}
+
+// Allège le téléphone : les battements (RR) ne servent qu'au sommeil (HRV, respiration) ;
+// on les retire des minutes d'éveil de plus de 2 jours.
+async function prune(raw, sleeps) {
+  const cutoff = Math.floor(Date.now() / 60000) - 2880, keep = sleeps.map(s => [s.startTm - 30, s.endTm + 30]);
+  const drop = raw.filter(m => m.t < cutoff && m.b.length && !keep.some(([a, b]) => m.t >= a && m.t <= b));
+  if (drop.length) await tx('minutes', 'readwrite', s => { for (const m of drop) s.put({...m, b: []}); });
+  return drop.length;
+}
+
 // ---------------------------------------------------------------- import / export / réglages
 async function importFile(file) {
-  const data = JSON.parse(await file.text());
+  const u8 = new Uint8Array(await file.arrayBuffer());
+  const gz = u8[0] === 0x1f && u8[1] === 0x8b, data = JSON.parse(gz ? await gunzip(u8) : new TextDecoder().decode(u8));
   if (!data.minutes || !data.state) throw new Error('Fichier non reconnu.');
-  const map = new Map(); for (const m of data.minutes) map.set(m.t, m);
+  const map = new Map(); for (const m of data.minutes) { const x = Array.isArray(m) ? unpackMin(m) : m; map.set(x.t, x); }
   await tx('minutes', 'readwrite', s => s.clear());
   await putMinutes(map);
   await kvSet('state', Object.assign({}, DEFAULT_STATE, data.state));
   if (data.profil) await kvSet('profil', data.profil);
-  return data.minutes.length;
+  return map.size;
 }
-async function exportData() {
-  const blob = new Blob([JSON.stringify({version: 1, minutes: await allMinutes(), state: await getState(), profil: await kvGet('profil')})], {type: 'application/json'});
-  const name = `whoop_sauvegarde_${dateLocal(Date.now())}.json`, file = new File([blob], name, {type: 'application/json'});
+async function exportData() {  // fichier compact et compressé (format v2)
+  const {bytes, gz} = await gzip(JSON.stringify({version: 2, minutes: (await allMinutes()).map(packMin), state: await getState(), profil: await kvGet('profil')}));
+  const name = `whoop_sauvegarde_${dateLocal(Date.now())}.json${gz ? '.gz' : ''}`, file = new File([bytes], name, {type: 'application/octet-stream'});
   if (navigator.canShare && navigator.canShare({files: [file]})) return navigator.share({files: [file], title: name});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
 }
+const mb = n => (n / 1048576).toLocaleString('fr-FR', {maximumFractionDigits: 1}) + ' Mo';
 function settings() {
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:grid;place-items:end center';
-  kvGet('profil').then(p => {
-    p = p || {};
-    const f = (k, label, type, extra = '') => `<label style="display:block;margin:10px 0 4px;font-size:12px;color:var(--muted)">${label}</label>
-      <input data-k="${k}" type="${type}" value="${p[k] ?? ''}" ${extra} style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit">`;
+  Promise.all([kvGet('profil'), kvGet('backup'), navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : null]).then(([p, bk, est]) => {
+    p = p || {}; bk = bk || {};
+    const inp = (id, label, type, value, extra = '') => `<label style="display:block;margin:10px 0 4px;font-size:12px;color:var(--muted)">${label}</label>
+      <input ${id} type="${type}" value="${value ?? ''}" ${extra} style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit">`;
+    const f = (k, label, type, extra) => inp(`data-k="${k}"`, label, type, p[k], extra);
     const btn = (id, label, primary) => `<button id="${id}" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:${primary ? '0' : '1px solid var(--line)'};
       background:${primary ? 'var(--fg)' : 'var(--card)'};color:${primary ? 'var(--bg)' : 'var(--fg)'};font:inherit;font-weight:600">${label}</button>`;
+    const h = t => `<b style="display:block;font-size:15px;margin:26px 0 2px">${t}</b>`;
+    const status = bk.token ? `Activée${bk.last ? ` · dernière sauvegarde ${new Date(bk.last).toLocaleString('fr-FR', {dateStyle: 'short', timeStyle: 'short'})}` : ''}` : 'Non configurée';
     el.innerHTML = `<div style="background:var(--card);width:min(520px,100%);max-height:90vh;overflow:auto;border-radius:20px 20px 0 0;padding:20px 18px max(24px,env(safe-area-inset-bottom))">
       <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">Réglages</b><button id="x" class="syncb">✕</button></div>
-      ${f('naissance', 'Date de naissance', 'date')}${f('sexe', 'Sexe (H ou F)', 'text', 'maxlength="1"')}${f('poids', 'Poids (kg)', 'number', 'step="0.1"')}
+      ${h('Profil')}${f('naissance', 'Date de naissance', 'date')}${f('sexe', 'Sexe (H ou F)', 'text', 'maxlength="1"')}${f('poids', 'Poids (kg)', 'number', 'step="0.1"')}
       ${f('taille', 'Taille (cm)', 'number')}${f('fcMax', 'FC max (bpm, laisser vide si inconnue)', 'number')}${f('besoin', 'Besoin de sommeil (heures)', 'number', 'step="0.25"')}
-      ${btn('save', 'Enregistrer', true)}
-      <p style="font-size:12px;color:var(--muted);margin:18px 0 0">Tes données sont stockées uniquement dans ce téléphone. Fais une sauvegarde de temps en temps.</p>
-      ${btn('exp', 'Sauvegarder mes données (fichier)')}${btn('imp', 'Importer un fichier (PC ou sauvegarde)')}
-      <input id="file" type="file" accept=".json,application/json" style="display:none"><p id="msg" style="font-size:13px;margin-top:10px"></p></div>`;
+      ${btn('save', 'Enregistrer le profil', true)}
+      ${h('Sauvegarde automatique')}<p style="font-size:12px;color:var(--muted)">Après chaque synchro, les jours modifiés sont envoyés (compressés) dans ton dépôt GitHub privé. Statut : <b>${status}</b></p>
+      ${inp('id="repo"', 'Dépôt privé (nom-utilisateur/whoop-donnees)', 'text', bk.repo, 'autocapitalize="off" autocorrect="off"')}
+      ${inp('id="token"', 'Clé d’accès GitHub (fine-grained token)', 'password', bk.token, 'autocapitalize="off" autocorrect="off"')}
+      ${btn('bk', 'Activer et sauvegarder maintenant', true)}${btn('rs', 'Restaurer depuis GitHub')}
+      ${h('Fichier')}${btn('exp', 'Sauvegarder dans un fichier')}${btn('imp', 'Importer un fichier (PC ou sauvegarde)')}
+      <input id="file" type="file" style="display:none">
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">${est ? `Espace utilisé dans le téléphone : ${mb(est.usage || 0)}` : ''}</p>
+      <p id="msg" style="font-size:13px;margin-top:10px"></p></div>`;
     const msg = t => el.querySelector('#msg').textContent = t;
     el.querySelector('#x').onclick = () => el.remove();
     el.querySelector('#save').onclick = async () => {
       const o = {}; el.querySelectorAll('input[data-k]').forEach(i => { const v = i.value.trim(); o[i.dataset.k] = v === '' ? null : i.type === 'number' ? +v : v; });
       if (o.sexe) o.sexe = o.sexe.toUpperCase(); await kvSet('profil', o); location.reload(); };
+    el.querySelector('#bk').onclick = async () => {
+      const repo = el.querySelector('#repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, ''), token = el.querySelector('#token').value.trim();
+      if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) return msg('Renseigne le dépôt (nom-utilisateur/whoop-donnees) et la clé d’accès.');
+      const old = (await kvGet('backup')) || {};
+      await kvSet('backup', {...old, repo, token, ...(old.repo !== repo ? {lastT: null} : {})});
+      try { const r = await backupGitHub(msg, old.repo !== repo || !old.last); msg(`Sauvegarde OK ✓ : ${r.days} jour(s), ${mb(r.bytes)}`); }
+      catch (e) { msg('Sauvegarde impossible : ' + e.message); }
+    };
+    el.querySelector('#rs').onclick = async () => {
+      if (!confirm('Remplacer les données de ce téléphone par la sauvegarde GitHub ?')) return;
+      try { const n = await restoreGitHub(msg); msg(n + ' minutes restaurées.'); setTimeout(() => location.reload(), 800); }
+      catch (e) { msg('Restauration impossible : ' + e.message); }
+    };
     el.querySelector('#exp').onclick = () => exportData().catch(e => msg('Sauvegarde impossible : ' + e.message));
     el.querySelector('#imp').onclick = () => el.querySelector('#file').click();
     el.querySelector('#file').onchange = async e => { try { msg('Import en cours…'); const n = await importFile(e.target.files[0]); msg(n + ' minutes importées.'); setTimeout(() => location.reload(), 700); }
@@ -1110,8 +1272,10 @@ function settings() {
 
 // ---------------------------------------------------------------- démarrage
 async function start() {
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}  // évite l'effacement automatique
   const state = await getState(), raw = await allMinutes(), profil = await kvGet('profil');
   window.D_DATA = compute(raw, state, profil);
+  prune(raw, window.D_DATA.sleeps).catch(() => {});
   window.WHOOP_SERVER = true;  // affiche le bouton ↻ de l'interface
   const ui = document.getElementById('ui'), s = document.createElement('script');
   s.textContent = ui.textContent; document.body.appendChild(s);
@@ -1120,8 +1284,14 @@ async function start() {
     document.querySelector('.syncb') && document.querySelector('.syncb').classList.add('spin');
     try {
       const r = await syncBracelet(t => window.sheet('Synchronisation du bracelet…', [t]));
-      window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`]);
-      setTimeout(() => location.reload(), 1200);
+      const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`];
+      window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
+      try {
+        const b = await backupGitHub(t => window.sheet('Sauvegarde automatique…', [t]));
+        lines.push(b ? `sauvegardé sur GitHub ✓ (${mb(b.bytes)})` : 'sauvegarde auto non configurée (Réglages)');
+      } catch (e) { lines.push('sauvegarde GitHub échouée : ' + e.message); }
+      window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
+      setTimeout(() => location.reload(), 2200);
     } catch (e) {
       window.__syncing = false; document.querySelector('.syncb') && document.querySelector('.syncb').classList.remove('spin');
       window.sheet('Synchro impossible', [e.message]); setTimeout(() => window.sheet('', [], false), 8000);
@@ -1132,7 +1302,8 @@ async function start() {
   a.onclick = settings; foot.appendChild(document.createElement('br')); foot.appendChild(a);
   if (!raw.length) settings();
 }
-window.WHOOP_ENGINE = {decodeR18, decodeFrame, encodeCmd, Reassembler, ingest, compute, newMin, start, DEFAULT_STATE};
+window.WHOOP_ENGINE = {decodeR18, decodeFrame, encodeCmd, Reassembler, ingest, compute, newMin, start, DEFAULT_STATE,
+  packMin, unpackMin, gzip, gunzip, byDayMinutes};
 if (!window.WHOOP_TEST) start().catch(e => { document.getElementById('app').innerHTML = '<div class="card">Erreur au démarrage : ' + e.message + '</div>'; });
 })();
 
