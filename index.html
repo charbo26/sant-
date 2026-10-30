@@ -126,6 +126,14 @@ font-size:13px;font-weight:700;color:#fff}
 .week .sm{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .cmp{display:grid;grid-template-columns:1fr auto auto;gap:4px 16px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .cmp:first-of-type{border-top:0}.cmp .v{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.gauge{position:relative;height:8px;border-radius:4px;background:var(--soft);margin:10px 0 4px}
+.gauge b{position:absolute;top:0;height:8px;opacity:.38}.gauge b:first-child{border-radius:4px 0 0 4px}.gauge b:last-of-type{border-radius:0 4px 4px 0}
+.gauge i{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--fg);transform:translateX(-50%);box-shadow:0 0 0 2px var(--card)}
+.q{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}
+.q i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13px;cursor:pointer;user-select:none;
+transition:background .15s,color .15s}.chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .rec{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid var(--line)}.rec:first-of-type{border-top:0}
 .rec .v{font-weight:650;font-variant-numeric:tabular-nums}.rec .s{font-size:12px;color:var(--muted)}
 footer{margin-top:24px;font-size:12px;color:var(--muted);text-align:center;line-height:1.8}
@@ -252,6 +260,72 @@ function deltaHtml(key, idx) {
   const pct = (v - b.avg) / b.avg * 100, better = M[key].better;
   const cls = Math.abs(pct) < 3 || !better ? '' : (pct > 0) === (better === 'up') ? 'good' : 'bad';
   return `<span class="delta ${cls}">${pct >= 0 ? '▲' : '▼'} ${fmt(Math.abs(pct))} % vs moy. 30 j</span>`;
+}
+
+// ---------- repères : norme générale, plage personnelle, statut et fiabilité de chaque donnée
+function refOf(key) {
+  const P = D.profile, male = !P.sex || String(P.sex).toUpperCase().startsWith('H'), age = P.age || 30;
+  const nm = male ? 47 - 0.33 * (age - 20) : 41 - 0.30 * (age - 20), hl = age < 30 ? 35 : age < 45 ? 25 : 18;
+  return ({
+    hrv: {lo: hl, hi: 130, txt: `normal ${hl}–130 ms la nuit à ton âge`},
+    rhr: {lo: 38, hi: 70, txt: 'normal 38–70 bpm (sportif : 38–55)'},
+    resp: {lo: 11, hi: 20, txt: 'normal 11–20 /min pendant le sommeil'},
+    spo2: {lo: 95, hi: 100, txt: 'normal 95–100 %'},
+    temp: {lo: 31, hi: 35.5, txt: 'normal 31–35,5 °C (peau du poignet)'},
+    vo2: {lo: Math.round(nm - 5), hi: null, txt: `moyenne de ton âge ${fmt(nm)} · bon ≥ ${fmt(nm + 5)}`},
+    steps: {lo: 8000, hi: null, txt: 'recommandé ≥ 8 000 pas'},
+    stress: {lo: null, hi: 1.5, txt: 'calme < 1 · élevé > 2'},
+    recovery: {lo: 34, hi: null, txt: 'vert ≥ 67 · jaune 34-66 · rouge ≤ 33'},
+    sleepH: {lo: 7, hi: 9.5, txt: 'recommandé 7 à 9 h'},
+    strain: {lo: null, hi: null, txt: 'léger < 10 · modéré 10-14 · élevé 14-18'},
+    cal: {lo: null, hi: null, txt: 'dépend de ton activité'},
+  })[key] || null;
+}
+function quality(key, idx) {  // 3 = élevée, 2 = moyenne, 1 = faible ; avec la raison
+  const d = D.days[idx], n = nightOf(d.date), q = (s, why) => ({s, why});
+  if (['hrv', 'rhr', 'resp', 'spo2', 'temp', 'sleepH'].includes(key)) {
+    if (!n) return null;
+    const cov = n.cover ?? 1, pc = `${Math.round(cov * 100)} % de la nuit mesurée`;
+    if (key === 'hrv' || key === 'resp') { const b = n.beats ?? 0, need = key === 'resp' ? 3000 : 1500;
+      return b >= need && cov >= .9 ? q(3, `${fmt(b)} battements valides`) : b >= need / 5 ? q(2, `${fmt(b)} battements valides`) : q(1, `peu de battements exploitables (${fmt(b)})`); }
+    if (key === 'spo2') return q(cov >= .9 ? 2 : 1, 'mesure expérimentale du bracelet');
+    return cov >= .9 ? q(3, pc) : cov >= .7 ? q(2, pc) : q(1, pc);
+  }
+  if (key === 'vo2') { const k = D.days.slice(Math.max(0, idx - 6), idx + 1).filter(x => x.rhr).length;
+    return k >= 7 ? q(3, '7 nuits de référence') : k >= 3 ? q(2, `${k} nuits sur 7`) : q(1, 'moins de 3 nuits'); }
+  if (['steps', 'cal', 'stress', 'strain'].includes(key)) { const h = d.hours || 0;
+    return h >= 20 ? q(3, `${fmt(h)} h mesurées sur 24`) : h >= 12 ? q(2, `${fmt(h)} h mesurées sur 24`) : q(1, `seulement ${fmt(h, 1)} h mesurées`); }
+  if (key === 'recovery') { if (d.recovery == null) return null; const hq = quality('hrv', idx);
+    return d.calibrage >= 14 && hq && hq.s === 3 ? q(3, `référence de ${d.calibrage} nuits`) : q(2, `référence de ${d.calibrage} nuits (idéal : 14 et plus)`); }
+  return null;
+}
+const QTXT = ['', 'faible', 'moyenne', 'élevée'];
+function statusOf(key, idx) {
+  const v = val(D.days[idx], key, idx); if (v == null) return null;
+  const r = refOf(key), b = baseline(key, idx), better = (M[key] || {}).better;
+  let txt = '✓ dans la norme', col = '--green';
+  if (r && r.lo != null && v < r.lo) { txt = '↓ sous la norme'; col = better === 'up' || key === 'spo2' || key === 'sleepH' ? '--red' : '--yellow'; }
+  else if (r && r.hi != null && v > r.hi) { txt = '↑ au-dessus de la norme'; col = better === 'down' || key === 'stress' ? '--red' : '--yellow'; }
+  if (b && b.sd != null) {
+    const z = (v - b.avg) / Math.max(b.sd, Math.abs(b.avg) * 0.03, 0.01);
+    if (Math.abs(z) > 1.5) { const good = better ? (z > 0) === (better === 'up') : null;
+      txt += ` · ${z > 0 ? 'haut' : 'bas'} pour toi`; if (col === '--green') col = good ? '--green' : '--yellow'; }
+  }
+  return {txt, col};
+}
+function qualLine(key, idx) {
+  const s = statusOf(key, idx), q = quality(key, idx); if (!s && !q) return '';
+  return `<div class="q">${s ? `<i style="background:${css(s.col)}"></i>${s.txt}` : ''}${q ? `${s ? ' · ' : ''}fiabilité ${QTXT[q.s]}` : ''}</div>`;
+}
+function refCard(key, idx) {
+  const r = refOf(key), b = baseline(key, idx), s = statusOf(key, idx), q = quality(key, idx), m = M[key];
+  return `<div class="card"><h2><span>Repères et fiabilité</span></h2>
+    <div class="cmp"><div>Norme générale</div><div class="v" style="font-weight:500">${r ? r.txt : '—'}</div><div></div></div>
+    <div class="cmp"><div>Ta plage habituelle</div><div class="v">${b && b.sd != null ? `${fmt(b.avg - b.sd, m.dig)}–${fmt(b.avg + b.sd, m.dig)} ${m.unit}` : 'après 3 jours'}</div><div></div></div>
+    <div class="cmp"><div>Statut ce jour</div><div class="v" style="color:${s ? css(s.col) : 'inherit'}">${s ? s.txt : '—'}</div><div></div></div>
+    <div class="cmp"><div>Fiabilité de la mesure</div><div class="v">${q ? `${QTXT[q.s]} <span class="delta">(${q.why})</span>` : '—'}</div><div></div></div>
+    <p class="desc" style="margin-top:8px">La norme générale vient des références médicales pour ton âge ; ta plage habituelle est ta moyenne ± un écart-type sur 30 jours.
+    « Haut / bas pour toi » signale un écart inhabituel par rapport à toi-même : c’est souvent plus parlant que la norme générale. La fiabilité dépend de la quantité de mesures valides.</p></div>`;
 }
 
 // ---------- graphiques (SVG net, courbes lissées, animés, interactifs)
@@ -389,7 +463,7 @@ function ring(frac, color, value, unit, size = 130) {
 function tile(key, idx) {
   const m = M[key], v = val(D.days[idx], key, idx);
   return `<a class="tile" href="#/m/${key}/${D.days[idx].date}"><div class="lbl">${m.name}</div>
-    <div class="v">${fmt(v, m.dig)}${v != null && m.unit ? `<small>${m.unit}</small>` : ''}</div>${deltaHtml(key, idx)}</a>`;
+    <div class="v">${fmt(v, m.dig)}${v != null && m.unit ? `<small>${m.unit}</small>` : ''}</div>${deltaHtml(key, idx)}${qualLine(key, idx)}</a>`;
 }
 function zonesHtml(zones) {
   const tot = sum(zones || []);
@@ -408,15 +482,54 @@ function navDate(view, idx, extra = '') {
   return `<div class="datebar">${prev}<h1>${longDate(D.days[idx].date)}</h1>${next}</div>`;
 }
 
-// ---------- sommeil : dette, régularité, heure de coucher conseillée
+// ---------- sommeil : besoin du jour (façon WHOOP), performance, régularité, dette, heure de coucher
+function needAfter(i) {  // besoin de sommeil pour la nuit qui suit le jour i : base + effort + dette - siestes
+  const d = D.days[i];
+  if (!d) return {base: NEED, strain: 0, debt: 0, naps: 0, total: NEED};
+  const strain = d.strain > 10 ? Math.min(60, (d.strain - 10) * 4) : 0;
+  const nights = D.days.slice(Math.max(0, i - 2), i + 1).map(x => nightOf(x.date)).filter(Boolean);
+  const debt = Math.min(60, sum(nights.map(x => Math.max(0, NEED - x.asleep))) / 3);
+  const naps = sum(D.sleeps.filter(s => s.type === 'Sieste' && s.date === d.date).map(s => s.asleep));
+  return {base: NEED, strain, debt, naps, total: Math.round(Math.max(NEED * 0.8, NEED + strain + debt - naps))};
+}
+const needFor = idx => needAfter(idx - 1);
+const NSET = new Map();
+function nightSet(n) {  // minutes endormies, en heure de la journée (décalée de 12 h pour que la nuit soit continue)
+  if (NSET.has(n)) return NSET.get(n);
+  const s = new Set(), a = epochMin(n.start), b = epochMin(n.end), w = n.wakeSegs.map(([x, y]) => [epochMin(x), epochMin(y)]);
+  for (let t = a; t < b; t++) if (!w.some(([x, y]) => t >= x && t < y)) { const d = new Date(t * 60000); s.add((d.getHours() * 60 + d.getMinutes() + 720) % 1440); }
+  NSET.set(n, s); return s;
+}
+const CONS = {};
+function consistency(idx) {  // régularité façon WHOOP : recouvrement des horaires de sommeil avec les 3 nuits précédentes
+  if (idx in CONS) return CONS[idx];
+  const nights = D.days.slice(Math.max(0, idx - 3), idx + 1).map(x => nightOf(x.date)).filter(Boolean);
+  if (nights.length < 2 || !nightOf(D.days[idx].date)) return (CONS[idx] = null);
+  const sets = nights.map(nightSet), last = sets[sets.length - 1];
+  const j = sets.slice(0, -1).map(s => { let k = 0; for (const v of s) if (last.has(v)) k++; return k / (s.size + last.size - k); });
+  return (CONS[idx] = Math.round(mean(j) * 100));
+}
 function sleepWeek(idx) {
   const nights = D.days.slice(Math.max(0, idx - 6), idx + 1).map(x => nightOf(x.date)).filter(Boolean);
   const tod = iso => { const t = new Date(iso); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; };
   const debt = sum(nights.map(x => Math.max(0, NEED - x.asleep)));
   const wake = median(nights.map(x => tod(x.end))), awake = mean(nights.map(x => x.inbed - x.asleep)) || 15;
-  const tonightNeed = NEED + Math.min(60, debt * 0.25);
+  const tonightNeed = needAfter(idx).total;
   return {nights, debt, avg: mean(nights.map(x => x.asleep)), regBed: sd(nights.map(x => tod(x.start))), regWake: sd(nights.map(x => tod(x.end))),
     wake, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed};
+}
+const STAGE = {W: ['Éveil', '--line'], R: ['Paradoxal (REM)', '--violet'], L: ['Léger', '--z2'], D: ['Profond', '#2c3e9e']};
+const stageColor = k => STAGE[k][1].startsWith('--') ? css(STAGE[k][1]) : STAGE[k][1];
+function hypnogram(n) {
+  const s = n.stages || ''; if (!s) return '';
+  const row = {W: 0, R: 1, L: 2, D: 3}, segs = []; let i = 0;
+  while (i < s.length) { let j = i; while (j < s.length && s[j] === s[i]) j++; segs.push([s[i], i, j]); i = j; }
+  const a = epochMin(n.start), ticks = [0, .25, .5, .75, 1].map(f => `<span>${minLabel(a + Math.round(f * s.length))}</span>`).join('');
+  return `<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:stretch">
+    <div style="display:grid;grid-template-rows:repeat(4,1fr);font-size:11px;color:var(--muted)">${['Éveil', 'Paradoxal', 'Léger', 'Profond'].map(t => `<span style="align-self:center">${t}</span>`).join('')}</div>
+    <svg viewBox="0 0 ${s.length} 4" preserveAspectRatio="none" style="width:100%;height:120px;display:block;background:var(--soft);border-radius:8px">
+      ${segs.map(([k, x0, x1], q) => `<rect x="${x0}" y="${row[k] + .12}" width="${x1 - x0}" height=".76" rx="0" fill="${stageColor(k)}"/>${q ? `<line x1="${x0}" x2="${x0}" y1="${row[segs[q - 1][0]] + .5}" y2="${row[k] + .5}" stroke="${css('--muted')}" stroke-width="1" vector-effect="non-scaling-stroke" opacity=".35"/>` : ''}`).join('')}
+    </svg><span></span><div class="tl-l">${ticks}</div></div>`;
 }
 
 // ---------- bilan du jour (conseils automatiques)
@@ -432,8 +545,11 @@ function insights(idx) {
   } else if (d.sleep != null) add(css('--muted'), '…', `Recovery en calibrage (${Math.min(d.calibrage, 4)}/4 nuits) : encore ${Math.max(0, 4 - d.calibrage)} nuit${4 - d.calibrage > 1 ? 's' : ''} pour connaître tes valeurs habituelles.`);
   if (d.hrv && bh) { const p = (d.hrv - bh.avg) / bh.avg * 100;
     if (Math.abs(p) >= 8) add(p > 0 ? css('--green') : css('--red'), p > 0 ? '▲' : '▼', `HRV ${p > 0 ? 'au-dessus' : 'en dessous'} de ton habitude (${fmt(d.hrv)} ms contre ${fmt(bh.avg)} ms).`); }
-  if (d.sleep != null) { const w = sleepWeek(idx), pct = d.sleep / NEED * 100;
-    add(css('--violet'), 'z', `${hm(d.sleep)} de sommeil (${fmt(pct)} % de ton besoin)${w.debt >= 60 ? ` · dette de ${hm(w.debt)} sur 7 jours` : ''}.`);
+  if (d.sleep != null) { const w = sleepWeek(idx), nd = needFor(idx), pct = d.sleep / nd.total * 100, n = nightOf(d.date);
+    add(css('--violet'), 'z', `${hm(d.sleep)} de sommeil pour un besoin de ${hm(nd.total)} (performance ${fmt(pct)} %)${n && n.deep != null ? ` · ${hm(n.deep + n.rem)} de sommeil réparateur` : ''}${w.debt >= 60 ? ` · dette de ${hm(w.debt)} sur 7 jours` : ''}.`);
+    const prevJ = idx > 0 ? (JOURNAL[D.days[idx - 1].date] || []) : [];
+    const noted = JITEMS.filter(([k]) => prevJ.includes(k) && ['alcool', 'cafeine', 'repas', 'ecrans', 'stress', 'malade'].includes(k)).map(([, , l]) => l.toLowerCase());
+    if (noted.length) add(css('--amber'), '✎', `Hier, tu as noté : ${noted.join(', ')}. Regarde l’effet sur ta nuit et ta Recovery.`);
     if (idx === D.days.length - 1 && w.bedtime != null) add(css('--violet'), '☾', `Ce soir, couche-toi vers ${hhmm(w.bedtime)} pour te lever à ${hhmm(w.wake)} avec ${hm(w.tonightNeed)} de sommeil.`); }
   const st = stressOf(idx);
   if (st && st.lvl[2] >= 30) add(css('--amber'), '!', `${hm(st.lvl[2])} de stress élevé aujourd’hui (hors sport).`);
@@ -444,15 +560,15 @@ function insights(idx) {
 // ---------- vues
 function viewDay(idx) {
   const d = D.days[idx], night = nightOf(d.date), acts = D.acts.map((a, i) => [a, i]).filter(([a]) => a.date === d.date);
-  const sleepPct = d.sleep == null ? null : Math.round(d.sleep / NEED * 100);
+  const sleepPct = d.sleep == null ? null : Math.round(d.sleep / needFor(idx).total * 100);
   const recSub = d.recovery != null ? (d.recovery >= 67 ? 'prêt à performer' : d.recovery >= 34 ? 'correcte' : 'repos conseillé')
     : d.sleep == null ? 'en attente d’une nuit' : `calibrage ${Math.min(d.calibrage, 4)}/4 nuits`;
   const hr = dayHr(d.date), ins = insights(idx), st = stressOf(idx), steps = hourlySteps(d.date);
   return navDate('jour', idx) + (ins.alert ? `<div class="card alert"><div class="insight"><span class="ic" style="background:${css('--red')}">!</span><div>${ins.alert}</div></div></div>` : '') + `
   <div class="rings">
-    <a class="ring" href="#/recovery/${d.date}">${ring((d.recovery || 0) / 100, recColor(d.recovery), d.recovery == null ? '—' : d.recovery + ' %', '')}<div class="lbl">Recovery</div><div class="sub">${recSub}</div></a>
-    <a class="ring" href="#/strain/${d.date}">${ring((d.strain || 0) / 21, css('--blue'), fmt(d.strain, 1), 'sur 21')}<div class="lbl">Strain</div><div class="sub">${d.nbAct} activité${d.nbAct > 1 ? 's' : ''}</div></a>
-    <a class="ring" href="#/sommeil/${d.date}">${ring((sleepPct || 0) / 100, css('--violet'), sleepPct == null ? '—' : sleepPct + ' %', d.sleep == null ? '' : hm(d.sleep))}<div class="lbl">Sommeil</div><div class="sub">${d.sleep == null ? 'pas de nuit' : 'de ton besoin'}</div></a>
+    <a class="ring" href="#/recovery/${d.date}">${ring((d.recovery || 0) / 100, recColor(d.recovery), d.recovery == null ? '—' : d.recovery + ' %', '')}<div class="lbl">Recovery</div><div class="sub">${recSub}</div>${qualLine('recovery', idx)}</a>
+    <a class="ring" href="#/strain/${d.date}">${ring((d.strain || 0) / 21, css('--blue'), fmt(d.strain, 1), 'sur 21')}<div class="lbl">Strain</div><div class="sub">${d.nbAct} activité${d.nbAct > 1 ? 's' : ''}</div>${qualLine('strain', idx)}</a>
+    <a class="ring" href="#/sommeil/${d.date}">${ring(Math.min(sleepPct || 0, 100) / 100, css('--violet'), sleepPct == null ? '—' : sleepPct + ' %', d.sleep == null ? '' : hm(d.sleep))}<div class="lbl">Sommeil</div><div class="sub">${d.sleep == null ? 'pas de nuit' : 'performance'}</div>${qualLine('sleepH', idx)}</a>
   </div>
   ${ins.out.length ? `<div class="card"><h2><span>Bilan du jour</span></h2>${ins.out.map(i => `<div class="insight"><span class="ic" style="background:${i.color}">${i.icon}</span><div>${i.text}</div></div>`).join('')}</div>` : ''}
   ${(a => a ? `<a class="card" href="#/age"><h2><span>Âge physiologique ›</span><span>${a.days < 30 ? 'provisoire' : '30 derniers jours'}</span></h2>
@@ -466,6 +582,7 @@ function viewDay(idx) {
       xTicks: [0, 6, 12, 18, 23].map(h => ({x: h, label: h + ' h'}))})}</div>
   </div>
   <div class="card" style="margin-top:12px"><h2><span>Activités</span></h2>${acts.length ? acts.map(([a, i]) => actRow(a, i)).join('') : '<div class="empty">Aucune activité détectée ce jour.</div>'}</div>
+  ${journalCard(d.date)}
   <div class="card"><h2><span>Sommeil</span></h2>${night ? `<a class="row" href="#/sommeil/${d.date}"><div><div class="t">${clock(night.start)} → ${clock(night.end)}</div>
     <div class="s">efficacité ${fmt(night.eff * 100)} % · ${night.wakes} réveil${night.wakes > 1 ? 's' : ''} · FC min ${fmt(night.hrMin)} bpm</div></div>
     <div class="r"><div class="t">${hm(night.asleep)}</div><div class="s">endormi</div></div></a>` : '<div class="empty">Pas de nuit enregistrée pour ce jour.</div>'}</div>`;
@@ -539,26 +656,38 @@ function viewSleep(idx) {
   const d = D.days[idx], n = nightOf(d.date), w = sleepWeek(idx);
   const plan = idx === D.days.length - 1 && w.bedtime != null ? `<div class="card"><h2><span>Ce soir</span></h2><div class="stats" style="margin:0">
     ${statBox('Coucher conseillé', hhmm(w.bedtime))}${statBox('Lever habituel', hhmm(w.wake))}${statBox('Sommeil visé', hm(w.tonightNeed))}</div>
-    <p class="desc">Basé sur ton besoin (${hm(NEED)}), ta dette de sommeil et le temps que tu passes éveillé au lit.</p></div>` : '';
+    <p class="desc">Ton besoin de cette nuit (base ${hm(NEED)} + effort du jour + dette − siestes), plus le temps que tu passes éveillé au lit.</p></div>` : '';
   if (!n) return navDate('sommeil', idx) + `<div class="card empty">Pas de nuit enregistrée pour ce jour.</div>${plan}
     <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin'})}</div>`;
-  const pct = Math.round(n.asleep / NEED * 100), a = epochMin(n.start), span = epochMin(n.end) - a;
-  const segs = n.wakeSegs.map(([s, e]) => `<i style="left:${(epochMin(s) - a) / span * 100}%;width:${Math.max(.4, (epochMin(e) - epochMin(s)) / span * 100)}%"></i>`).join('');
-  const pts = hrBetween(a, epochMin(n.end));
-  return navDate('sommeil', idx) + `<div class="card" style="text-align:center">${ring(pct / 100, css('--violet'), pct + ' %', hm(n.asleep), 170)}
-    <p class="verdict">${pct >= 85 ? 'Sommeil suffisant.' : pct >= 70 ? 'Sommeil un peu court.' : 'Sommeil insuffisant.'} Besoin : ${hm(NEED)}.</p></div>
-  <div class="card"><h2><span>Ta nuit</span><span>violet = endormi · clair = réveillé</span></h2>
-    <div class="timeline">${segs}</div><div class="tl-l"><span>${clock(n.start)}</span><span>${clock(n.end)}</span></div>
-    <div class="stats" style="margin:14px 0 0">${statBox('Endormi', hm(n.asleep))}${statBox('Au lit', hm(n.inbed))}${statBox('Efficacité', fmt(n.eff * 100), '%')}
-    ${statBox('Réveils', fmt(n.wakes))}${statBox('FC min', fmt(n.hrMin), 'bpm')}${statBox('FC moy.', fmt(n.hrAvg), 'bpm')}${statBox('HRV', fmt(n.hrv), 'ms')}
-    ${statBox('Respiration', fmt(n.resp, 1), '/min')}${statBox('SpO2', fmt(n.spo2), '%')}${statBox('Temp. peau', fmt(n.temp, 1), '°C')}</div></div>
+  const need = needFor(idx), pct = Math.round(n.asleep / need.total * 100), a = epochMin(n.start), cons = consistency(idx);
+  const pts = hrBetween(a, epochMin(n.end)), asl = n.asleep || 1, rest = (n.deep || 0) + (n.rem || 0), wakeMin = n.inbed - n.asleep;
+  const stRow = (k, min, ref) => `<div class="zrow"><div style="display:flex;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:${stageColor(k)}"></i>${STAGE[k][0].split(' ')[0]}</div>
+    <div class="b"><i style="width:${min / n.inbed * 100}%;background:${stageColor(k)}"></i></div><div class="m">${hm(min)} · ${fmt(min / (k === 'W' ? n.inbed : asl) * 100)} %${ref ? ` <span style="opacity:.6">(${ref})</span>` : ''}</div></div>`;
+  return navDate('sommeil', idx) + `<div class="card" style="text-align:center">${ring(Math.min(pct, 100) / 100, css('--violet'), pct + ' %', 'performance', 170)}
+    <p class="verdict">${hm(n.asleep)} de sommeil sur un besoin de ${hm(need.total)} · ${pct >= 85 ? 'sommeil optimal' : pct >= 70 ? 'sommeil un peu court' : 'sommeil insuffisant'}</p>
+    <div class="stats" style="margin:8px 0 0">${statBox('Performance', pct + ' %')}${statBox('Régularité', cons == null ? '—' : cons + ' %', '', cons == null ? '2 nuits min.' : '')}
+      ${statBox('Efficacité', fmt(n.eff * 100), '%')}${statBox('Sommeil réparateur', hm(rest), '', fmt(rest / asl * 100) + ' % du sommeil')}</div></div>
+  <div class="card"><h2><span>Phases de sommeil</span><span>${clock(n.start)} → ${clock(n.end)}</span></h2>${hypnogram(n)}
+    <div style="margin-top:12px">${stRow('W', wakeMin)}${stRow('L', n.light || 0, '45-55 %')}${stRow('D', n.deep || 0, '15-25 %')}${stRow('R', n.rem || 0, '20-25 %')}</div>
+    <p class="desc" style="margin-top:8px">Phases estimées à partir du cœur (fréquence et régularité) et des mouvements, sans électrodes : fiabilité moyenne. Le profond domine en début de nuit, le paradoxal en fin de nuit.</p></div>
+  <div class="card"><h2><span>Ta nuit en chiffres</span></h2><div class="stats" style="margin:0">${statBox('Endormi', hm(n.asleep))}${statBox('Au lit', hm(n.inbed))}
+    ${statBox('Coucher', clock(n.start))}${statBox('Lever', clock(n.end))}${statBox('Réveils', fmt(n.wakes))}${statBox('FC min', fmt(n.hrMin, 1), 'bpm')}
+    ${statBox('FC moy.', fmt(n.hrAvg, 1), 'bpm')}${statBox('HRV', fmt(n.hrv, 1), 'ms')}${statBox('Respiration', fmt(n.resp, 1), '/min')}${statBox('SpO2', fmt(n.spo2), '%')}
+    ${statBox('Temp. peau', fmt(n.temp, 2), '°C')}</div>
+    <div class="q">Fiabilité : ${['hrv', 'rhr', 'resp', 'temp'].map(k => { const q = quality(k, idx); return q ? `${M[k].name} ${QTXT[q.s]}` : ''; }).filter(Boolean).join(' · ')}
+      · ${Math.round((n.cover ?? 1) * 100)} % de la nuit mesurée · ${fmt(n.beats ?? 0)} battements valides</div></div>
+  <div class="card"><h2><span>Ton besoin de sommeil cette nuit</span><span>${hm(need.total)}</span></h2>
+    <div class="cmp"><div>Besoin de base</div><div class="v">${hm(need.base)}</div><div></div></div>
+    <div class="cmp"><div>Effort de la veille (strain)</div><div class="v">+ ${hm(need.strain)}</div><div></div></div>
+    <div class="cmp"><div>Dette des 3 dernières nuits</div><div class="v">+ ${hm(need.debt)}</div><div></div></div>
+    <div class="cmp"><div>Siestes de la veille</div><div class="v">− ${hm(need.naps)}</div><div></div></div></div>
   <div class="card"><h2><span>Fréquence cardiaque pendant la nuit</span></h2>${hrStats(pts)}${hrChart(pts, {xTicks: rangeTicks(pts), smoothWin: 3})}</div>
   ${plan}
   <div class="card"><h2><span>7 derniers jours</span></h2><div class="stats" style="margin:0">
     ${statBox('Dette de sommeil', hm(w.debt))}${statBox('Moyenne', hm(w.avg))}
     ${statBox('Régularité coucher', w.regBed == null ? '—' : '± ' + fmt(w.regBed), 'min')}${statBox('Régularité lever', w.regWake == null ? '—' : '± ' + fmt(w.regWake), 'min')}</div></div>
-  <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin'})}</div>
-  <p class="desc" style="text-align:center">Détection : ${n.source.toLowerCase()}. Pas de phases (léger / profond / paradoxal).</p>`;
+  <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin de base'})}</div>
+  <p class="desc" style="text-align:center">Détection : ${n.source.toLowerCase()}.</p>`;
 }
 let period = 30;
 function viewMetric(key, idx) {
@@ -570,6 +699,7 @@ function viewMetric(key, idx) {
     ${st ? `<div class="stats">${statBox('Moyenne', fmt(st.avg, m.dig), m.unit)}${statBox('Min', fmt(st.min.y, m.dig), m.unit, shortDate(st.min.date))}
       ${statBox('Max', fmt(st.max.y, m.dig), m.unit, shortDate(st.max.date))}${statBox('Plage normale', b && b.sd != null ? fmt(b.avg - b.sd, m.dig) + '–' + fmt(b.avg + b.sd, m.dig) : '—', m.unit)}</div>` : ''}
     ${dailyChart(key, idx, period, {h: 220, ...(b && b.sd != null && m.type !== 'bar' ? {band: [b.avg - b.sd, b.avg + b.sd]} : {})})}</div>
+  ${refCard(key, idx)}
   <div class="card"><p class="desc">${m.desc}</p></div>`;
 }
 function viewAct(i) {
@@ -584,48 +714,127 @@ function viewAct(i) {
   <div class="card"><h2><span>Temps par zone cardiaque</span></h2>${zonesHtml(a.zones)}</div>`;
 }
 
-// ---------- âge physiologique (inspiré du « WHOOP Age » : 8 habitudes sur les 30 derniers jours)
+// ---------- journal (habitudes notées chaque jour -> effet mesuré sur la Recovery du lendemain)
+const JITEMS = [['alcool', '🍷', 'Alcool'], ['cafeine', '☕', 'Caféine après 14 h'], ['repas', '🍽️', 'Repas tardif'], ['ecrans', '📱', 'Écrans au lit'],
+  ['muscu', '🏋️', 'Musculation'], ['etirements', '🧘', 'Étirements / yoga'], ['meditation', '🌿', 'Méditation / respiration'],
+  ['lumiere', '☀️', 'Lumière du jour le matin'], ['stress', '⚡', 'Journée stressante'], ['malade', '🤒', 'Malade / fatigué'], ['rien', '✓', 'Rien de tout ça']];
+let JOURNAL = window.D_JOURNAL || (() => { try { return JSON.parse(localStorage.getItem('whoop_journal') || '{}'); } catch (e) { return {}; } })();
+function storeJournal() { if (window.WHOOP_SAVE_JOURNAL) window.WHOOP_SAVE_JOURNAL(JOURNAL); else try { localStorage.setItem('whoop_journal', JSON.stringify(JOURNAL)); } catch (e) {} }
+function toggleJ(date, k, el) {
+  const a = new Set(JOURNAL[date] || []); a.has(k) ? a.delete(k) : a.add(k);
+  if (k !== 'rien' && a.has(k)) a.delete('rien');
+  if (k === 'rien' && a.has('rien')) { a.clear(); a.add('rien'); }
+  JOURNAL[date] = [...a]; storeJournal();
+  el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', a.has(c.dataset.k)));
+}
+const journalCard = date => `<div class="card"><h2><span>Journal du jour</span><span>coche ce que tu as fait ce jour-là</span></h2><div class="chips">
+  ${JITEMS.map(([k, ic, l]) => `<span class="chip ${(JOURNAL[date] || []).includes(k) ? 'on' : ''}" data-k="${k}" onclick="toggleJ('${date}','${k}',this)">${ic} ${l}</span>`).join('')}</div>
+  <p class="desc" style="margin-top:10px">Chaque habitude est comparée à ta Recovery du lendemain : l’effet réel apparaît dans Tendances après 3 jours avec et 3 jours sans.</p></div>`;
+function journalEffects() {
+  const next = d => D.days[IDX[addDays(d, 1)]];
+  const dates = Object.keys(JOURNAL).filter(d => next(d) && next(d).recovery != null);
+  return JITEMS.filter(([k]) => k !== 'rien').map(([k, ic, l]) => {
+    const yes = dates.filter(d => JOURNAL[d].includes(k)), no = dates.filter(d => !JOURNAL[d].includes(k));
+    const m = (arr, key) => mean(arr.map(d => next(d)[key]));
+    return {k, ic, l, ny: yes.length, nn: no.length, ok: yes.length >= 3 && no.length >= 3,
+      dr: m(yes, 'recovery') - m(no, 'recovery'), ry: m(yes, 'recovery'), rn: m(no, 'recovery'),
+      dh: m(yes, 'hrv') != null && m(no, 'hrv') != null ? m(yes, 'hrv') - m(no, 'hrv') : null,
+      ds: m(yes, 'sleep') != null && m(no, 'sleep') != null ? m(yes, 'sleep') - m(no, 'sleep') : null};
+  });
+}
+function journalTrends() {
+  const e = journalEffects(), ok = e.filter(x => x.ok).sort((a, b) => a.dr - b.dr);
+  const pending = e.filter(x => !x.ok && x.ny > 0);
+  if (!ok.length) return `<div class="empty">Remplis le journal du jour (onglet Aujourd’hui). Dès qu’une habitude a 3 jours « avec » et 3 jours « sans », son effet sur ta Recovery s’affiche ici.${pending.length ? '<br>En cours : ' + pending.map(x => `${x.ic} ${x.ny}/3`).join(' · ') : ''}</div>`;
+  const maxD = Math.max(10, ...ok.map(x => Math.abs(x.dr)));
+  return ok.map(x => `<div class="corr"><div>${x.ic} ${x.l}<div class="s">Recovery le lendemain : ${fmt(x.ry)} % avec · ${fmt(x.rn)} % sans${x.dh != null ? ` · HRV ${x.dh > 0 ? '+' : ''}${fmt(x.dh)} ms` : ''}${x.ds != null ? ` · sommeil ${x.ds > 0 ? '+' : '−'}${hm(Math.abs(x.ds))}` : ''}</div></div>
+    <div class="cbar"><i style="${x.dr >= 0 ? `left:50%;width:${x.dr / maxD * 50}%` : `left:${50 + x.dr / maxD * 50}%;width:${-x.dr / maxD * 50}%`};background:${x.dr >= 0 ? css('--green') : css('--red')}"></i></div>
+    <div class="delta ${x.dr >= 0 ? 'good' : 'bad'}" style="text-align:right">${x.dr > 0 ? '+' : ''}${fmt(x.dr)} pts</div></div>`).join('')
+    + (pending.length ? `<p class="desc" style="margin-top:8px">En cours : ${pending.map(x => `${x.ic} ${x.ny}/3`).join(' · ')}</p>` : '');
+}
+
+// ---------- Healthspan : âge physiologique, rythme de vieillissement (inspiré du « WHOOP Age »)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-function bioAge() {
-  const P = D.profile; if (!P.age || D.days.length < 3) return null;
-  const male = !P.sex || String(P.sex).toUpperCase().startsWith('H'), days = D.days.slice(-30), n = days.length;
+const BIO = {};
+function bioAgeAt(endIdx) {
+  if (endIdx in BIO) return BIO[endIdx];
+  const P = D.profile; if (!P.age || endIdx < 2) return (BIO[endIdx] = null);
+  const male = !P.sex || String(P.sex).toUpperCase().startsWith('H'), start = Math.max(0, endIdx - 29), days = D.days.slice(start, endIdx + 1), n = days.length;
   const nights = days.map(d => nightOf(d.date)).filter(Boolean), f = [];
-  const add = (name, value, delta, advice) => f.push({name, value, delta: Math.abs(delta) < 0.05 ? 0 : +delta.toFixed(2), advice});
+  // fn : effet en années selon la valeur ; opt : valeur « optimale » visée ; seg : zones de la jauge
+  const add = (cat, key, name, num, txt, fn, opt, seg, lo, hi, target, advice) => {
+    const d = fn(num), b = Math.min(d, fn(opt));
+    f.push({cat, key, name, num, txt, delta: Math.abs(d) < 0.05 ? 0 : +d.toFixed(2), best: +b.toFixed(2), seg, lo, hi, target, advice}); };
   const vo2 = [...days].reverse().find(d => d.vo2 != null)?.vo2;
-  if (vo2) { const norm = male ? 47 - 0.33 * (P.age - 20) : 41 - 0.30 * (P.age - 20);
-    add('VO2max', `${fmt(vo2, 1)} ml/kg/min (moyenne de ton âge : ${fmt(norm, 0)})`, clamp((norm - vo2) * 0.3, -4, 4), 'Endurance : course, vélo, natation 2-3 fois par semaine.'); }
+  if (vo2) { const nm = male ? 47 - 0.33 * (P.age - 20) : 41 - 0.30 * (P.age - 20);
+    add('forme', 'vo2', 'VO2max', vo2, `${fmt(vo2, 1)} ml/kg/min · moyenne de ton âge ${fmt(nm, 1)}`, v => clamp((nm - v) * 0.3, -4, 4), nm + 10,
+      [[nm - 15, nm - 3, '--red'], [nm - 3, nm + 5, '--yellow'], [nm + 5, nm + 15, '--green']], nm - 15, nm + 15, `optimal ≥ ${fmt(nm + 5)}`, 'Endurance : course, vélo, natation 2-3 fois par semaine, dont une séance intense.'); }
   const rhr = mean(days.map(d => d.rhr));
-  if (rhr) add('FC de repos', `${fmt(rhr)} bpm en moyenne`, clamp((rhr - 62) * 0.15, -3, 3), 'Elle baisse avec l’endurance, le sommeil et moins d’alcool.');
+  if (rhr) add('forme', 'rhr', 'FC de repos', rhr, `${fmt(rhr, 1)} bpm en moyenne`, v => clamp((v - 62) * 0.15, -3, 3), 50,
+    [[40, 55, '--green'], [55, 65, '--yellow'], [65, 85, '--red']], 40, 85, 'optimal ≤ 55 bpm', 'Elle baisse avec l’endurance, un bon sommeil et moins d’alcool.');
   if (nights.length >= 3) {
     const h = mean(nights.map(x => x.asleep)) / 60;
-    add('Durée du sommeil', `${hm(h * 60)} par nuit`, h < 7 ? clamp((7 - h) * 0.6, 0, 3) : h > 9 ? clamp((h - 9) * 0.3, 0, 1.5) : -0.5, 'Vise 7 à 9 h par nuit.');
-    const tod = iso => { const t = new Date(iso); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; };
-    const sdb = sd(nights.map(x => tod(x.start)));
-    if (sdb != null) add('Régularité du sommeil', `coucher à ± ${fmt(sdb)} min`, clamp((sdb - 45) / 30 * 0.5, -1, 1.5), 'Couche-toi et lève-toi à heures fixes, même le week-end.');
+    add('sommeil', 'duree', 'Durée du sommeil', h, `${hm(h * 60)} par nuit en moyenne`, v => v < 7 ? clamp((7 - v) * 0.6, 0, 3) : v > 9 ? clamp((v - 9) * 0.3, 0, 1.5) : -0.5, 8,
+      [[5, 7, '--red'], [7, 7.5, '--yellow'], [7.5, 9, '--green'], [9, 9.5, '--yellow'], [9.5, 10.5, '--red']], 5, 10.5, 'optimal 7 h 30 à 9 h', 'Vise 7 h 30 à 9 h de sommeil par nuit.');
+    const cs = days.map((d, j) => consistency(start + j)).filter(x => x != null);
+    if (cs.length >= 2) { const c = mean(cs);
+      add('sommeil', 'regularite', 'Régularité du sommeil', c, `${fmt(c)} % de régularité`, v => clamp((75 - v) / 15 * 0.5, -1, 1.5), 90,
+        [[30, 65, '--red'], [65, 80, '--yellow'], [80, 100, '--green']], 30, 100, 'optimal ≥ 80 %', 'Couche-toi et lève-toi aux mêmes heures, même le week-end.'); }
   }
   const full = days.filter(d => d.hours >= 12);
   if (full.length) { const st = mean(full.map(d => d.steps));
-    add('Pas par jour', `${fmt(st)} en moyenne`, clamp((8000 - st) / 2000 * 0.5, -1.5, 2), 'Vise au moins 8 000 pas par jour.'); }
+    add('effort', 'pas', 'Pas par jour', st, `${fmt(st)} pas par jour en moyenne`, v => clamp((8000 - v) / 2000 * 0.5, -1.5, 2), 12000,
+      [[0, 7000, '--red'], [7000, 10000, '--yellow'], [10000, 15000, '--green']], 0, 15000, 'optimal ≥ 10 000', 'Marche davantage : trajets à pied, escaliers, pauses actives.'); }
   const wk = z => sum(days.map(d => sum((d.zones || []).slice(z[0], z[1])))) * 7 / n;
   const mod = wk([0, 3]), vig = wk([3, 5]);
-  add('Effort modéré (zones 1-3)', `${hm(mod)} par semaine (objectif 2 h 30)`, clamp((150 - mod) / 150 * 1.2, -1.2, 1.2), '150 min par semaine d’effort modéré (marche rapide, footing léger).');
-  add('Effort intense (zones 4-5)', `${hm(vig)} par semaine (objectif 1 h 15)`, clamp((75 - vig) / 75 * 0.8, -1, 0.8), '75 min par semaine d’effort intense (fractionné, sport collectif).');
+  add('effort', 'modere', 'Effort modéré (zones 1-3)', mod, `${hm(mod)} par semaine`, v => clamp((150 - v) / 150 * 1.2, -1.2, 1.2), 300,
+    [[0, 150, '--red'], [150, 300, '--yellow'], [300, 450, '--green']], 0, 450, 'optimal ≥ 5 h / semaine', 'Marche rapide, footing léger, vélo tranquille : 150 à 300 min par semaine.');
+  add('effort', 'intense', 'Effort intense (zones 4-5)', vig, `${hm(vig)} par semaine`, v => clamp((75 - v) / 75 * 0.8, -1, 0.8), 150,
+    [[0, 75, '--red'], [75, 150, '--yellow'], [150, 225, '--green']], 0, 225, 'optimal ≥ 2 h 30 / semaine', 'Fractionné, sport collectif, côtes : 75 à 150 min par semaine.');
+  const jd = days.filter(d => JOURNAL[d.date]);
+  if (jd.length >= 7) { const m = jd.filter(d => JOURNAL[d.date].includes('muscu')).length * 7 / jd.length;
+    add('effort', 'muscu', 'Musculation', m, `${fmt(m, 1)} séance(s) par semaine (journal)`, v => clamp((2 - v) * 0.4, -0.4, 0.8), 3,
+      [[0, 1, '--red'], [1, 2, '--yellow'], [2, 4, '--green']], 0, 4, 'optimal ≥ 2 / semaine', 'Renforcement musculaire 2 à 3 fois par semaine (note-le dans le journal).'); }
   const total = sum(f.map(x => x.delta));
-  return {real: P.age, bio: +(P.age + total).toFixed(1), diff: +total.toFixed(1), factors: f.sort((a, b) => b.delta - a.delta), days: n};
+  return (BIO[endIdx] = {real: P.age, bio: +(P.age + total).toFixed(1), diff: +total.toFixed(1), factors: f, days: n,
+    potential: +(P.age + sum(f.map(x => x.best))).toFixed(1), date: D.days[endIdx].date});
 }
+const bioAge = () => bioAgeAt(D.days.length - 1);
+function bioHistory() { const out = []; for (let i = 6; i < D.days.length; i++) { const b = bioAgeAt(i); if (b) out.push(b); } return out; }  // 7 jours min. par point
+function paceOfAging(hist) {  // rythme de vieillissement : 1,0x = normal ; < 1 = tu vieillis moins vite que le calendrier
+  const h = hist.slice(-180); if (h.length < 30) return null;
+  const xs = h.map((_, i) => i), ys = h.map(b => b.diff), mx = mean(xs), my = mean(ys);
+  const slope = sum(xs.map((x, i) => (x - mx) * (ys[i] - my))) / sum(xs.map(x => (x - mx) ** 2));
+  return +clamp(1 + slope * 365, -1, 3).toFixed(1);
+}
+const gauge = (seg, lo, hi, v) => `<div class="gauge">${seg.map(([a, b, c]) => `<b style="left:${(a - lo) / (hi - lo) * 100}%;width:${(b - a) / (hi - lo) * 100}%;background:${css(c)}"></b>`).join('')}
+  <i style="left:${clamp((v - lo) / (hi - lo) * 100, 1, 99)}%"></i></div>`;
 function viewAge() {
   const a = bioAge();
-  if (!a) return `<div class="title"><h1>Âge physiologique</h1></div><div class="card empty">Il faut ta date de naissance (profil) et au moins 3 jours de données.</div>`;
-  const younger = a.diff < 0, maxD = Math.max(1, ...a.factors.map(x => Math.abs(x.delta)));
-  return `<div class="title"><h1>Âge physiologique</h1><p>basé sur tes ${a.days} derniers jours${a.days < 30 ? ' · estimation provisoire, fiable après 30 jours' : ''}</p></div>
-  <div class="card" style="text-align:center"><div class="big">${fmt(a.bio, 1)}<small>ans</small></div>
-    <p class="verdict">Âge réel : ${a.real} ans · <b class="${younger ? 'good' : a.diff > 0 ? 'bad' : ''}">${younger ? fmt(-a.diff, 1) + ' ans plus jeune' : a.diff > 0 ? fmt(a.diff, 1) + ' ans plus vieux' : 'égal à ton âge'}</b></p></div>
-  <div class="card"><h2><span>Ce qui te rajeunit ou te vieillit</span><span>en années</span></h2>
-    ${a.factors.map(x => `<div class="contrib"><div><div class="t">${x.name}</div><div class="s">${x.value}</div></div>
+  if (!a) return `<div class="title"><h1>Healthspan</h1></div><div class="card empty">Il faut ta date de naissance (Réglages / profil) et au moins 3 jours de données.</div>`;
+  const hist = bioHistory(), pace = paceOfAging(hist), prev = bioAgeAt(D.days.length - 8), younger = a.diff < 0;
+  const cats = [['sommeil', 'Sommeil', '--violet'], ['effort', 'Effort', '--blue'], ['forme', 'Forme', '--green']];
+  const row = x => { const p = prev && prev.factors.find(y => y.key === x.key), tr = p ? x.num - p.num : null;
+    return `<div class="contrib"><div><div class="t">${x.name}</div><div class="s">${x.txt}${tr != null && Math.abs(tr) > 1e-9 ? ` · ${tr > 0 ? '▲' : '▼'} vs il y a 7 j` : ''}</div></div>
       <div class="r ${x.delta < -0.05 ? 'good' : x.delta > 0.05 ? 'bad' : ''}">${x.delta > 0 ? '+' : ''}${fmt(x.delta, 1)} an${Math.abs(x.delta) >= 2 ? 's' : ''}</div>
-      <div class="cbar" style="grid-column:1/3;margin-top:6px"><i style="${x.delta >= 0 ? `left:50%;width:${x.delta / maxD * 50}%` : `left:${50 + x.delta / maxD * 50}%;width:${-x.delta / maxD * 50}%`};background:${x.delta >= 0 ? css('--red') : css('--green')}"></i></div>
-      ${x.delta > 0.05 ? `<div class="s" style="grid-column:1/3;margin-top:4px">→ ${x.advice}</div>` : ''}</div>`).join('')}</div>
-  <div class="card"><p class="desc">Estimation maison inspirée du « WHOOP Age » : même famille d’habitudes (sommeil, régularité, pas, temps en zones cardiaques, VO2max, FC de repos), comparées aux recommandations de santé et aux moyennes de ton âge. Ce n’est pas un diagnostic médical ; c’est son évolution qui compte.</p></div>`;
+      <div style="grid-column:1/3">${gauge(x.seg, x.lo, x.hi, x.num)}<div class="s" style="display:flex;justify-content:space-between"><span>${x.target}</span>${x.best < x.delta - 0.05 ? `<span>potentiel ${fmt(x.best, 1)} an</span>` : ''}</div></div>
+      ${x.delta > 0.05 || x.best < x.delta - 0.05 ? `<div class="s" style="grid-column:1/3;margin-top:4px">→ ${x.advice}</div>` : ''}</div>`; };
+  return `<div class="title"><h1>Healthspan</h1><p>basé sur tes ${a.days} derniers jours${a.days < 30 ? ' · estimation provisoire, fiable après 30 jours' : ''}</p></div>
+  <div class="card" style="text-align:center"><div class="lbl">Âge physiologique</div><div class="big">${fmt(a.bio, 1)}<small>ans</small></div>
+    <p class="verdict" style="margin-top:4px">Âge réel ${a.real} ans · <b class="${younger ? 'good' : a.diff > 0 ? 'bad' : ''}">${younger ? fmt(-a.diff, 1) + ' an(s) plus jeune' : a.diff > 0 ? fmt(a.diff, 1) + ' an(s) plus vieux' : 'égal à ton âge'}</b></p>
+    <div class="stats" style="margin:10px 0 0">${statBox('Rythme de vieillissement', pace == null ? '—' : fmt(pace, 1) + 'x', '', pace == null ? `après 30 jours (${hist.length}/30)` : pace < 1 ? 'plus lent que le calendrier' : pace > 1 ? 'plus rapide que le calendrier' : 'normal')}
+      ${statBox('Évolution sur 7 jours', prev ? (a.bio - prev.bio > 0 ? '+' : '') + fmt(a.bio - prev.bio, 1) + ' an' : '—')}${statBox('Ton potentiel', fmt(a.potential, 1) + ' ans', '', 'si tous les objectifs sont atteints')}</div></div>
+  <div class="card"><h2><span>Rythme de vieillissement</span><span>de −1x à 3x</span></h2>
+    ${gauge([[-1, 0.8, '--green'], [0.8, 1.2, '--yellow'], [1.2, 3, '--red']], -1, 3, pace ?? 1)}
+    <div class="tl-l"><span>−1x</span><span>0</span><span>1x</span><span>2x</span><span>3x</span></div>
+    <p class="desc" style="margin-top:8px">${pace == null ? `Il mesure la vitesse à laquelle ton âge physiologique avance par rapport au calendrier : il faut au moins 30 jours d’historique (${hist.length}/30).`
+      : `À ${fmt(pace, 1)}x, ton corps vieillit ${pace < 1 ? 'moins vite' : pace > 1 ? 'plus vite' : 'au même rythme'} que le calendrier : en un an, ton âge physiologique avancerait d’environ ${fmt(pace, 1)} an.`}</p></div>
+  ${hist.length >= 2 ? `<div class="card"><h2><span>Âge physiologique dans le temps</span></h2>${chartBox({points: hist.map((b, i) => ({x: i, y: b.bio, label: shortDate(b.date)})), color: '--green', dig: 1, unit: 'ans', ref: a.real, refLabel: 'âge réel', h: 180,
+    xTicks: hist.filter((_, i) => i % Math.max(1, Math.ceil(hist.length / 6)) === 0).map((b) => ({x: hist.indexOf(b), label: shortDate(b.date)})), tickDig: 1})}</div>` : ''}
+  ${cats.map(([k, label, col]) => { const fs = a.factors.filter(x => x.cat === k); if (!fs.length) return '';
+    const s = sum(fs.map(x => x.delta));
+    return `<div class="card"><h2><span style="color:${css(col)}">${label}</span><span class="${s < -0.05 ? 'good' : s > 0.05 ? 'bad' : ''}">${s > 0 ? '+' : ''}${fmt(s, 1)} an au total</span></h2>${fs.map(row).join('')}</div>`; }).join('')}
+  <div class="card"><p class="desc">Estimation maison inspirée du « WHOOP Age » (Healthspan) : 9 habitudes sur les 30 derniers jours (sommeil, régularité, pas, temps en zones cardiaques, musculation via le journal, VO2max, FC de repos) comparées aux recommandations de santé et aux moyennes de ton âge. Le rythme de vieillissement est la pente de ton âge physiologique sur les 6 derniers mois. Ce n’est pas un diagnostic médical : c’est l’évolution qui compte.</p></div>`;
 }
 
 // ---------- semaine
@@ -706,9 +915,12 @@ function viewTrends() {
       ${dailyChart(key, idx, period, {h: 140, ...(key === 'sleepH' ? {ref: NEED / 60, refLabel: 'besoin'} : {})})}</a>`; };
   const ag = bioAge();
   return `<div class="title"><h1>Tendances</h1></div>
-  ${ag ? `<a class="card" href="#/age"><h2><span>Âge physiologique ›</span><span>âge réel ${ag.real} ans</span></h2><div class="big" style="font-size:34px;text-align:left">${fmt(ag.bio, 1)}<small>ans</small></div></a>` : ''}
+  ${ag ? `<a class="card" href="#/age"><h2><span>Healthspan ›</span><span>âge réel ${ag.real} ans</span></h2><div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
+    <div><div class="lbl">Âge physiologique</div><div class="big" style="font-size:34px;text-align:left">${fmt(ag.bio, 1)}<small>ans</small></div></div>
+    <div><div class="lbl">Rythme</div><div class="big" style="font-size:34px;text-align:left">${(p => p == null ? '—' : fmt(p, 1) + 'x')(paceOfAging(bioHistory()))}</div></div></div></a>` : ''}
   <div class="card"><h2><span>Calendrier de la Recovery</span><span>16 semaines</span></h2>${calendar()}</div>
   <div class="card"><h2><span>Ce qui influence ta Recovery</span></h2>${influences()}</div>
+  <div class="card"><h2><span>Ton journal : effet sur ta Recovery</span><span>le lendemain</span></h2>${journalTrends()}</div>
   <div class="seg">${seg}</div>
   <div class="two">${['recovery', 'strain', 'sleepH', 'hrv', 'rhr', 'stress', 'steps', 'cal', 'vo2', 'resp', 'temp', 'spo2'].map(card).join('')}</div>
   <div class="card" style="margin-top:12px"><h2><span>Tes records</span></h2>${records()}</div>`;
@@ -778,7 +990,7 @@ document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new D
   + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
 route();
 </script>
-<script>window.WHOOP_VERSION='28/10/2026 12:01'</script>
+<script>window.WHOOP_VERSION='30/10/2026 08:27'</script>
 <script>
 // iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
 // Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
@@ -954,6 +1166,28 @@ function profilOf(p) {
   const hrMax = p.fcMax || (age ? Math.round(208 - 0.7 * age) : 190);
   return {...p, age, hrMax, complete: !!(age && p.sexe && p.poids && p.taille)};
 }
+function estimateStages(sess, start, n) {  // même algorithme que estimate_stages (whoop_analyse.py)
+  const byT = new Map(sess.map(m => [m.tm, m])), seq = [];
+  for (let i = 0; i < n; i++) seq.push(byT.get(start + i) || null);
+  const idx = []; seq.forEach((m, i) => { if (m && m.hr != null) idx.push(i); });
+  const out = seq.map(m => m ? 'L' : 'W');
+  if (idx.length < 30) return out.join('');
+  const hr = {}, vr = {}, mv = {};
+  idx.forEach(i => { hr[i] = seq[i].hr; mv[i] = seq[i].mov || 0; });
+  idx.forEach(i => { vr[i] = pstdev(idx.filter(j => Math.abs(j - i) <= 3).map(j => hr[j])); });
+  const z = d => { const v = idx.map(i => d[i]), m = v.reduce((s, x) => s + x, 0) / v.length, s = pstdev(v) || 1, o = {}; idx.forEach(i => o[i] = (d[i] - m) / s); return o; };
+  const zh = z(hr), zv = z(vr), movs = idx.map(i => mv[i]).sort((a, b) => a - b);
+  const p50 = movs[Math.floor(movs.length / 2)], p75 = movs[Math.floor(movs.length * .75)];
+  const deep = new Set(idx.filter(i => i < 0.7 * n && mv[i] <= p50).sort((a, b) => (zh[a] + zv[a]) - (zh[b] + zv[b]) || a - b).slice(0, Math.round(0.2 * idx.length)));
+  const rem = new Set(idx.filter(i => i >= 60 && !deep.has(i) && mv[i] <= p75).sort((a, b) => (zh[b] + zv[b]) - (zh[a] + zv[a]) || a - b).slice(0, Math.round(0.22 * idx.length)));
+  idx.forEach(i => { out[i] = deep.has(i) ? 'D' : rem.has(i) ? 'R' : 'L'; });
+  const sm = out.slice();
+  for (let i = 0; i < n; i++) if (out[i] !== 'W') {
+    const w = out.slice(Math.max(0, i - 4), Math.min(n, i + 5)).filter(c => c !== 'W'), c = k => w.filter(x => x === k).length;
+    sm[i] = ['L', 'D', 'R'].reduce((best, k) => c(k) > c(best) ? k : best, 'L');
+  }
+  return sm.join('');
+}
 function detectSleep(mins) {
   const strap = mins.some(m => m.etat === 2);
   const asleep = m => strap ? m.etat === 2 : (m.mov != null && m.mov < 0.03 && m.act === 0 && m.hr != null);
@@ -969,8 +1203,9 @@ function detectSleep(mins) {
     const hrs = s.map(m => m.hr).filter(x => x != null), roll = [];
     for (let i = 0; i + 5 <= hrs.length; i++) roll.push(hrs.slice(i, i + 5).reduce((a, b) => a + b, 0) / 5);
     const beats = cleanBeats(s.flatMap(m => m.beats).sort((a, b) => a[0] - b[0])), spo2 = s.flatMap(m => m.spo2);
-    const midH = new Date((start + inBed / 2) * 60000).getHours();
-    out.push({date: dateLocal(end * 60000), type: s.length >= 180 || midH >= 20 || midH < 10 ? 'Nuit' : 'Sieste',
+    const midH = new Date((start + inBed / 2) * 60000).getHours(), stages = estimateStages(s, start, inBed);
+    out.push({beats: beats.length, cover: hrs.length / s.length, stages, deep: (stages.match(/D/g) || []).length, rem: (stages.match(/R/g) || []).length,
+      light: (stages.match(/L/g) || []).length, date: dateLocal(end * 60000), type: s.length >= 180 || midH >= 20 || midH < 10 ? 'Nuit' : 'Sieste',
       startTm: start, endTm: end, start: isoLocal(start * 60000), end: isoLocal(end * 60000), inbed: inBed, asleep: s.length,
       eff: inBed ? s.length / inBed : null, wakes: gaps.length, hrAvg: mean(hrs), hrMin: roll.length ? +Math.min(...roll).toFixed(1) : (hrs.length ? Math.min(...hrs) : null),
       hrv: rmssd(beats), resp: respRate(beats), spo2: spo2.length ? +median(spo2).toFixed(1) : null, temp: mean(s.map(m => m.skin), 2),
@@ -1052,25 +1287,51 @@ function compute(raw, state, profil) {
 }
 
 // ---------------------------------------------------------------- synchro Bluetooth directe
-async function syncBracelet(log) {
+const fmtN = n => n.toLocaleString('fr-FR');
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+async function rememberedWhoop() {  // bracelet déjà autorisé : reconnexion sans passer par la liste (si le navigateur le permet)
+  try { return navigator.bluetooth.getDevices ? (await navigator.bluetooth.getDevices()).find(d => (d.name || '').startsWith('WHOOP')) || null : null; }
+  catch (e) { return null; }
+}
+async function persist(map, state) {  // minutes + état écrits dans UNE seule transaction (rapide et cohérent)
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const t = db.transaction(['minutes', 'kv'], 'readwrite'), s = t.objectStore('minutes');
+    for (const m of map.values()) { const g = s.get(m.t); g.onsuccess = () => s.put(g.result ? mergeMin(g.result, m) : m); }
+    t.objectStore('kv').put(state, 'state');
+    t.oncomplete = res; t.onerror = () => rej(t.error);
+  });
+}
+async function syncBracelet(log, auto = false) {
   if (!navigator.bluetooth) throw new Error('Bluetooth indisponible : ouvre cette page dans l’app Bluefy.');
-  log('Choisis ton WHOOP dans la liste…');
-  const device = await navigator.bluetooth.requestDevice({filters: [{namePrefix: 'WHOOP'}], optionalServices: [SVC, 'battery_service']});
-  log('Connexion au bracelet…');
-  const server = await device.gatt.connect();
+  let device = await rememberedWhoop(), server = null;
+  if (device) {
+    log('Connexion au bracelet…');
+    try { server = await withTimeout(device.gatt.connect(), 12000, 'bracelet hors de portée'); } catch (e) { if (auto) throw e; device = null; }
+  }
+  if (!device) {
+    log('Choisis ton WHOOP dans la liste…');
+    device = await navigator.bluetooth.requestDevice({filters: [{namePrefix: 'WHOOP'}], optionalServices: [SVC, 'battery_service']});
+    log('Connexion au bracelet…');
+    server = await device.gatt.connect();
+  }
   let battery = null;
   try { battery = (await (await (await server.getPrimaryService('battery_service')).getCharacteristic('battery_level')).readValue()).getUint8(0); } catch (e) {}
   const svc = await server.getPrimaryService(SVC), cmd = await svc.getCharacteristic(CMD);
   const state = await getState(), map = new Map(), pending = [], acks = [];
-  let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0};
+  let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0}, wake = null;
+  let firstTs = null, lastRecTs = null, recs = 0;
+  const kick = () => { if (wake) { const w = wake; wake = null; w(); } };
   const asm = NOTIF.map(() => new Reassembler());
   const onFrame = f => {
-    if (f.pt === PT_HISTORICAL) { chunks++; last = Date.now(); if (f.sub === 18) { const r = decodeR18(f.payload); if (r) pending.push(r); } }
-    else if (f.pt === PT_METADATA) {
+    if (f.pt === PT_HISTORICAL) {
+      chunks++; last = Date.now();
+      if (f.sub === 18) { const r = decodeR18(f.payload); if (r) { pending.push(r); recs++; if (firstTs == null) firstTs = r.ts; lastRecTs = r.ts; } }
+    } else if (f.pt === PT_METADATA) {
       last = Date.now();
       const kind = [1, 2, 3].includes(f.cmd) ? f.cmd : f.payload[0];
-      if (kind === 2 && f.payload.length >= 18) acks.push(Array.from(f.payload.slice(10, 18)));
-      else if (kind === 3) complete = true;
+      if (kind === 2 && f.payload.length >= 18) { acks.push(Array.from(f.payload.slice(10, 18))); kick(); }
+      else if (kind === 3) { complete = true; kick(); }
     }
   };
   let subscribed = 0;
@@ -1086,17 +1347,25 @@ async function syncBracelet(log) {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const flush = async () => {  // on enregistre dans le téléphone AVANT de confirmer au bracelet
     if (pending.length) { const s = ingest(pending.splice(0), state, map); stats.dup += s.dup; stats.gaps += s.gaps; stats.added += s.added; }
-    if (map.size) { await putMinutes(map); map.clear(); await kvSet('state', state); }
+    if (map.size) { await persist(map, state); map.clear(); }
+  };
+  const progress = started => {  // part de la période à rattraper déjà reçue + temps restant estimé
+    if (firstTs == null) return `${fmtN(recs)} mesures reçues`;
+    const now = Date.now() / 1000, done = lastRecTs - firstTs, todo = Math.max(0, now - lastRecTs), el = (Date.now() - started) / 1000;
+    const pct = Math.min(99, Math.round(done / Math.max(1, done + todo) * 100)), eta = done > 0 ? todo / (done / el) : null;
+    return `${pct} % · ${fmtN(recs)} mesures${eta != null && el > 5 ? ` · encore ~${eta < 90 ? Math.max(1, Math.round(eta)) + ' s' : Math.round(eta / 60) + ' min'}` : ''}`;
   };
   try {
     log('Lecture de la mémoire du bracelet…');
-    await send(GET_HELLO); await sleep(1000); await send(LINK_VALID); await send(ENTER_HF); await sleep(500); await send(SEND_HISTORICAL);
-    last = Date.now(); const started = Date.now(); let keep = Date.now();
+    await send(GET_HELLO); await sleep(600); await send(LINK_VALID); await send(ENTER_HF); await sleep(300); await send(SEND_HISTORICAL);
+    last = Date.now(); const started = Date.now(); let keep = Date.now(), shown = 0;
     while (!complete) {
-      if (acks.length) { const a = acks.shift(); await flush(); await send(HISTORICAL_RESULT, [1, ...a]); log(`${chunks} blocs reçus…`); }
-      else await sleep(250);
+      if (acks.length) {
+        const a = acks.shift(); await flush(); await send(HISTORICAL_RESULT, [1, ...a]);
+        if (Date.now() - shown > 400) { log(progress(started)); shown = Date.now(); }
+      } else await new Promise(r => { wake = r; setTimeout(r, 1000); });  // réveil immédiat dès qu'un bloc est complet
       if (Date.now() - keep > 5000) { await send(LINK_VALID); keep = Date.now(); }
-      if (Date.now() - last > 30000 || Date.now() - started > 30 * 60000) break;
+      if (Date.now() - last > 30000 || Date.now() - started > 45 * 60000) break;
     }
   } finally {
     await flush();
@@ -1165,7 +1434,8 @@ async function backupGitHub(log = () => {}, full = false) {
     await ghPut(cfg, shas, `jours/${d.slice(0, 4)}/${d}.json${gz ? '.gz' : ''}`, bytes, 'Sauvegarde ' + d);
     bytesTotal += bytes.length;
   }
-  await ghPut(cfg, shas, 'etat.json', new TextEncoder().encode(JSON.stringify({state: await getState(), profil: await kvGet('profil')})), 'État');
+  await ghPut(cfg, shas, 'etat.json', new TextEncoder().encode(JSON.stringify({state: await getState(), profil: await kvGet('profil'),
+    journal: await kvGet('journal')})), 'État');
   await kvSet('shas', shas);
   const lastT = all.reduce((x, m) => Math.max(x, m.t), 0);
   await kvSet('backup', {...cfg, last: isoLocal(Date.now()), lastT, lastSize: bytesTotal});
@@ -1189,6 +1459,7 @@ async function restoreGitHub(log) {
   await tx('minutes', 'readwrite', s => { for (const m of map.values()) s.put(m); });
   if (etat.state) await kvSet('state', Object.assign({}, DEFAULT_STATE, etat.state));
   if (etat.profil) await kvSet('profil', etat.profil);
+  if (etat.journal) await kvSet('journal', etat.journal);
   return map.size;
 }
 
@@ -1211,10 +1482,11 @@ async function importFile(file) {
   await putMinutes(map);
   await kvSet('state', Object.assign({}, DEFAULT_STATE, data.state));
   if (data.profil) await kvSet('profil', data.profil);
+  if (data.journal) await kvSet('journal', data.journal);
   return map.size;
 }
 async function exportData() {  // fichier compact et compressé (format v2)
-  const {bytes, gz} = await gzip(JSON.stringify({version: 2, minutes: (await allMinutes()).map(packMin), state: await getState(), profil: await kvGet('profil')}));
+  const {bytes, gz} = await gzip(JSON.stringify({version: 2, minutes: (await allMinutes()).map(packMin), state: await getState(), profil: await kvGet('profil'), journal: await kvGet('journal')}));
   const name = `whoop_sauvegarde_${dateLocal(Date.now())}.json${gz ? '.gz' : ''}`, file = new File([bytes], name, {type: 'application/octet-stream'});
   if (navigator.canShare && navigator.canShare({files: [file]})) return navigator.share({files: [file], title: name});
   const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
@@ -1276,15 +1548,21 @@ async function start() {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}  // évite l'effacement automatique
   const state = await getState(), raw = await allMinutes(), profil = await kvGet('profil');
   window.D_DATA = compute(raw, state, profil);
+  window.D_JOURNAL = (await kvGet('journal')) || {};
+  window.WHOOP_SAVE_JOURNAL = j => kvSet('journal', j);  // sauvegardé sur GitHub à la prochaine synchro (etat.json)
   prune(raw, window.D_DATA.sleeps).catch(() => {});
   window.WHOOP_SERVER = true;  // affiche le bouton ↻ de l'interface
   const ui = document.getElementById('ui'), s = document.createElement('script');
   s.textContent = ui.textContent; document.body.appendChild(s);
-  window.startSync = async () => {
+  window.startSync = async (auto = false) => {
     if (window.__syncing) return; window.__syncing = true;
+    let lock = null;  // garde l'écran allumé pendant la synchro (sinon iOS coupe le Bluetooth de la page)
+    try { lock = navigator.wakeLock ? await navigator.wakeLock.request('screen') : null; } catch (e) {}
+    const keepNote = lock ? 'écran maintenu allumé, tu peux poser le téléphone' : 'garde l’appli ouverte pendant la synchro';
     document.querySelector('.syncb') && document.querySelector('.syncb').classList.add('spin');
     try {
-      const r = await syncBracelet(t => window.sheet('Synchronisation du bracelet…', [t]));
+      const r = await syncBracelet(t => window.sheet(auto ? 'Synchro automatique…' : 'Synchronisation du bracelet…', [t, keepNote]), auto);
+      try { lock && lock.release(); } catch (e) {}
       const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`];
       window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
       try {
@@ -1294,10 +1572,15 @@ async function start() {
       window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
       setTimeout(() => location.reload(), 2200);
     } catch (e) {
+      try { lock && lock.release(); } catch (err) {}
       window.__syncing = false; document.querySelector('.syncb') && document.querySelector('.syncb').classList.remove('spin');
+      if (auto) { window.sheet('', [], false); return; }  // synchro auto ratée (bracelet loin) : on ne dérange pas
       window.sheet('Synchro impossible', [e.message]); setTimeout(() => window.sheet('', [], false), 8000);
     }
   };
+  // Synchro automatique à l'ouverture si la dernière date de plus d'une heure et que le bracelet est mémorisé
+  const lastSync = state.syncs.length ? new Date(state.syncs[state.syncs.length - 1].date).getTime() : 0;
+  if (raw.length && navigator.bluetooth && Date.now() - lastSync > 3600e3) rememberedWhoop().then(d => d && window.startSync(true));
   const foot = document.getElementById('foot'), a = document.createElement('a');
   a.textContent = 'Réglages · sauvegarde · import'; a.href = 'javascript:void 0'; a.style.cssText = 'display:inline-block;margin-top:10px;text-decoration:underline';
   a.onclick = settings; foot.appendChild(document.createElement('br')); foot.appendChild(a);
