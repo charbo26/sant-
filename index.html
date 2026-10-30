@@ -552,7 +552,7 @@ function sleepWeek(idx) {
   const wake = median(nights.map(x => tod(x.end))), bed = median(nights.map(x => tod(x.start))), awake = mean(nights.map(x => x.inbed - x.asleep)) || 15;
   const tonightNeed = needAfter(idx).total;
   return {nights, debt, avg: mean(nights.map(x => x.asleep)), regBed: sd(nights.map(x => tod(x.start))), regWake: sd(nights.map(x => tod(x.end))),
-    wake, bed, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed,
+    wake, bed, awake, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed,
     wakeIfUsualBed: bed == null ? null : bed + tonightNeed + awake};  // réveil conseillé si tu te couches à ton heure habituelle
 }
 const STAGE = {W: ['Éveil', '--line'], R: ['Paradoxal (REM)', '--violet'], L: ['Léger', '--z2'], D: ['Profond', '#2c3e9e']};
@@ -771,16 +771,27 @@ function toggleJ(date, k, el) {
 }
 
 // ---------- réveil WHOOP (seulement dans l'appli iPhone, qui parle au bracelet)
+// Heure de réveil si tu t'endors maintenant : maintenant + besoin de la nuit + temps d'endormissement habituel.
+// Avant midi, la « veille » est le jour précédent (ex. couché à 5 h après une soirée notée la veille).
+window.WHOOP_ALARM_TARGET = () => {
+  if (!D.days.length) return null;
+  const i = new Date().getHours() < 12 && D.days.length > 1 ? D.days.length - 2 : D.days.length - 1;
+  return Math.floor(Date.now() / 1000 + (needAfter(i).total + (sleepWeek(i).awake || 15)) * 60);
+};
 function alarmCard(suggest) {
   if (!window.WHOOP_ALARM) return '';
   const al = window.D_ALARM || {on: false, repeat: true, time: suggest || '07:00'};
   const active = al.on && (al.repeat || (al.ts && al.ts * 1000 > Date.now())), when = al.ts ? new Date(al.ts * 1000) : null;
+  const tin = (id, v) => `<input id="${id}" type="time" value="${v}" style="font:inherit;font-size:15px;padding:4px 8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)">`;
   return `<div class="card"><h2><span>⏰ Réveil WHOOP</span><span>le bracelet vibre</span></h2>
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <input id="alt" type="time" value="${al.time || suggest || '07:00'}" style="font:inherit;font-size:30px;font-weight:650;padding:4px 10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg)">
       <label class="sw"><input id="alon" type="checkbox" ${active ? 'checked' : ''} onchange="alarmSet()"><span></span></label>
-      <span class="delta">${active ? `activé${when ? ' · ' + when.toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'}) : ''}` : 'désactivé'}</span></div>
+      <span class="delta">${active ? `activé${when ? ' · ' + when.toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'}) : ''}${al.shifted ? ' <b>(décalé : coucher tardif)</b>' : ''}` : 'désactivé'}</span></div>
     <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input id="alrep" type="checkbox" ${al.repeat !== false ? 'checked' : ''}> Répéter chaque jour (reprogrammé à chaque synchro)</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;flex-wrap:wrap"><input id="aladapt" type="checkbox" ${al.adapt ? 'checked' : ''}>
+      Adapter à mon heure de coucher, au plus tard à ${tin('allim', al.latest || '11:00')}</label>
+    <p class="desc" style="margin-top:4px">Ouvre l’appli juste avant de dormir : si tu te couches tard, le réveil est décalé pour que tu dormes ton besoin (sans dépasser la limite), puis revient à ton heure habituelle le lendemain.</p>
     ${suggest ? `<p class="desc" style="margin-top:8px">Pour dormir ton besoin en te couchant à ton heure habituelle : réveil vers <b>${suggest}</b>
       · <a href="javascript:void 0" style="text-decoration:underline" onclick="document.getElementById('alt').value='${suggest}'">utiliser cette heure</a></p>` : ''}
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn2" onclick="alarmSet(true)">Enregistrer l’heure</button><button class="btn2" onclick="alarmTest()">Tester la vibration</button></div></div>`;
@@ -790,8 +801,10 @@ async function alarmSet(save) {
   if (window.__syncing) { sheet('Réveil', ['Attends la fin de la synchro puis réessaie.']); box.checked = !box.checked; return setTimeout(() => sheet('', [], false), 3000); }
   try {
     sheet('Réveil', ['Connexion au bracelet…']);
-    window.D_ALARM = await window.WHOOP_ALARM(on ? 'set' : 'off', {time: document.getElementById('alt').value, repeat: document.getElementById('alrep').checked});
-    sheet(on ? 'Réveil activé ✓' : 'Réveil désactivé ✓', [on ? 'le bracelet vibrera ' + new Date(window.D_ALARM.ts * 1000).toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'}) : 'plus aucune vibration programmée']);
+    window.D_ALARM = await window.WHOOP_ALARM(on ? 'set' : 'off', {time: document.getElementById('alt').value, repeat: document.getElementById('alrep').checked,
+      adapt: document.getElementById('aladapt').checked, latest: document.getElementById('allim').value});
+    sheet(on ? 'Réveil activé ✓' : 'Réveil désactivé ✓', [on ? 'le bracelet vibrera ' + new Date(window.D_ALARM.ts * 1000).toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'})
+      + (window.D_ALARM.shifted ? ' (décalé : coucher tardif)' : '') : 'plus aucune vibration programmée']);
     setTimeout(() => { sheet('', [], false); route(); }, 2500);
   } catch (e) { box.checked = !on; sheet('Réveil impossible', [e.message]); setTimeout(() => sheet('', [], false), 6000); }
 }
@@ -1063,7 +1076,7 @@ document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new D
   + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
 route();
 </script>
-<script>window.WHOOP_VERSION='30/10/2026 10:28'</script>
+<script>window.WHOOP_VERSION='30/10/2026 10:42'</script>
 <script>
 // iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
 // Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
@@ -1405,12 +1418,27 @@ const nextAt = hhmm => {  // prochaine occurrence de l'heure HH:MM (aujourd'hui 
   if (t.getTime() <= Date.now() + 60000) t.setDate(t.getDate() + 1);
   return Math.floor(t.getTime() / 1000);
 };
+// Heure de réveil voulue : l'heure habituelle, ou plus tard si tu te couches tard (mode adapté),
+// sans dépasser la limite « au plus tard ». window.WHOOP_ALARM_TARGET (interface) donne : maintenant + besoin + endormissement.
+function desiredAlarm(al) {
+  const base = nextAt(al.time);
+  if (!al.adapt || !window.WHOOP_ALARM_TARGET) return {ts: base, shifted: false};
+  const t = window.WHOOP_ALARM_TARGET();
+  if (!t || t <= base || t - base > 12 * 3600) return {ts: base, shifted: false};
+  const [lh, lm] = (al.latest || '11:00').split(':').map(Number), lim = new Date(base * 1000); lim.setHours(lh, lm, 0, 0);
+  const latest = Math.max(base, Math.floor(lim.getTime() / 1000));
+  const ts = Math.min(Math.round(t / 60) * 60, latest);
+  return {ts, shifted: ts > base, capped: ts === latest && t > latest};
+}
 async function alarmCommand(action, opts = {}, log = () => {}) {
   const {server, cmd} = await connectWhoop(log);
   const send = async (c, p) => { const b = encodeCmd(c, p); cmd.writeValueWithResponse ? await cmd.writeValueWithResponse(b) : await cmd.writeValue(b); };
-  const al = Object.assign({on: false, time: '07:00', repeat: true, ts: null}, await kvGet('alarm'));
+  const al = Object.assign({on: false, time: '07:00', repeat: true, adapt: false, latest: '11:00', ts: null}, await kvGet('alarm'));
   try {
-    if (action === 'set') { al.time = opts.time; al.repeat = !!opts.repeat; al.ts = nextAt(opts.time); al.on = true; await send(SET_ALARM, alarmPayload(al.ts)); }
+    if (action === 'set') {
+      Object.assign(al, {time: opts.time, repeat: !!opts.repeat, adapt: !!opts.adapt, latest: opts.latest || al.latest, on: true});
+      const d = desiredAlarm(al); al.ts = d.ts; al.shifted = d.shifted; await send(SET_ALARM, alarmPayload(al.ts));
+    }
     if (action === 'off') { al.on = false; al.ts = null; await send(DISABLE_ALARM, [2, 0xFF]); }
     if (action === 'test') await send(HAPTIC, TEST_HAPTIC);
     await new Promise(r => setTimeout(r, 2500));  // le bracelet exécute la commande avant la déconnexion
@@ -1418,18 +1446,25 @@ async function alarmCommand(action, opts = {}, log = () => {}) {
   if (action !== 'test') await kvSet('alarm', al);
   return al;
 }
-async function maintainAlarm(send) {  // réveil répété : reprogrammé pour le lendemain à chaque synchro
+async function maintainAlarm(send) {  // à chaque synchro : réveil répété reprogrammé + décalage si coucher tardif
   const al = await kvGet('alarm');
-  if (!al || !al.on || !al.repeat || (al.ts && al.ts > Date.now() / 1000 + 60)) return;
-  al.ts = nextAt(al.time); await send(SET_ALARM, alarmPayload(al.ts)); await kvSet('alarm', al);
+  if (!al || !al.on) return null;
+  const passed = !al.ts || al.ts <= Date.now() / 1000 + 60;
+  if (passed && !al.repeat) return null;  // réveil ponctuel déjà sonné
+  const d = desiredAlarm(al);
+  if (!passed && Math.abs(d.ts - al.ts) < 60) return null;  // déjà à la bonne heure
+  al.ts = d.ts; al.shifted = d.shifted;
+  await send(SET_ALARM, alarmPayload(al.ts)); await kvSet('alarm', al);
   await new Promise(r => setTimeout(r, 2000));
+  const hh = new Date(al.ts * 1000).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+  return d.shifted ? `réveil décalé à ${hh} (coucher tardif${d.capped ? ', limite atteinte' : ''})` : `réveil programmé à ${hh}`;
 }
 
 async function syncBracelet(log, auto = false) {
   const {server, svc, cmd, battery} = await connectWhoop(log, auto);
   const state = await getState(), map = new Map(), pending = [], acks = [];
   let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0}, wake = null;
-  let firstTs = null, lastRecTs = null, recs = 0;
+  let firstTs = null, lastRecTs = null, recs = 0, alarmMsg = null;
   const kick = () => { if (wake) { const w = wake; wake = null; w(); } };
   const asm = NOTIF.map(() => new Reassembler());
   const onFrame = f => {
@@ -1479,7 +1514,7 @@ async function syncBracelet(log, auto = false) {
   } finally {
     await flush();
     for (const c of [ABORT_HISTORICAL, EXIT_HF]) { try { await send(c); } catch (e) {} }
-    try { await maintainAlarm(send); } catch (e) {}
+    try { alarmMsg = await maintainAlarm(send); } catch (e) {}
     dropped = asm.reduce((s, a) => s + a.dropped, 0);
     state.syncs.push({date: isoLocal(Date.now()), recus: chunks, nouveaux: stats.added, doublons: stats.dup, trous: stats.gaps,
       complet: complete, rejetes: dropped, battery});
@@ -1487,7 +1522,7 @@ async function syncBracelet(log, auto = false) {
     await kvSet('state', state);
     try { server.disconnect(); } catch (e) {}
   }
-  return {complete, ...stats, battery};
+  return {complete, ...stats, battery, alarmMsg};
 }
 
 // ---------------------------------------------------------------- format compact + compression
@@ -1675,7 +1710,7 @@ async function start() {
     try {
       const r = await syncBracelet(t => window.sheet(auto ? 'Synchro automatique…' : 'Synchronisation du bracelet…', [t, keepNote]), auto);
       try { lock && lock.release(); } catch (e) {}
-      const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`];
+      const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`, ...(r.alarmMsg ? ['⏰ ' + r.alarmMsg] : [])];
       window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
       try {
         const b = await backupGitHub(t => window.sheet('Sauvegarde automatique…', [t]));
