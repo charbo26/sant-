@@ -129,6 +129,11 @@ font-size:13px;font-weight:700;color:#fff}
 .gauge{position:relative;height:8px;border-radius:4px;background:var(--soft);margin:10px 0 4px}
 .gauge b{position:absolute;top:0;height:8px;opacity:.38}.gauge b:first-child{border-radius:4px 0 0 4px}.gauge b:last-of-type{border-radius:0 4px 4px 0}
 .gauge i{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--fg);transform:translateX(-50%);box-shadow:0 0 0 2px var(--card)}
+.sw{position:relative;width:52px;height:30px;display:inline-block;flex:none}.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;border-radius:15px;background:var(--line);transition:background .2s;cursor:pointer}
+.sw span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw input:checked+span{background:var(--green)}.sw input:checked+span:before{transform:translateX(22px)}
+.btn2{padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .q{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}
 .q i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -483,14 +488,45 @@ function navDate(view, idx, extra = '') {
 }
 
 // ---------- sommeil : besoin du jour (façon WHOOP), performance, régularité, dette, heure de coucher
-function needAfter(i) {  // besoin de sommeil pour la nuit qui suit le jour i : base + effort + dette - siestes
-  const d = D.days[i];
-  if (!d) return {base: NEED, strain: 0, debt: 0, naps: 0, total: NEED};
+let PN = null;
+function personalNeed() {  // besoin de base APPRIS : la durée de sommeil après laquelle ta Recovery est la meilleure
+  if (PN) return PN;
+  const pts = D.days.filter(d => d.sleep != null && d.recovery != null).map(d => [d.sleep / 60, d.recovery]), n = pts.length;
+  if (n < 10) return (PN = {min: NEED, n, learned: false});
+  // régression quadratique Recovery = a + b·h + c·h² (moindres carrés), sommet = durée idéale
+  const S = k => sum(pts.map(([h]) => h ** k)), T = k => sum(pts.map(([h, r]) => r * h ** k));
+  const A = [[n, S(1), S(2)], [S(1), S(2), S(3)], [S(2), S(3), S(4)]], B = [T(0), T(1), T(2)];
+  const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const dA = det(A), col = (j) => A.map((r, i) => r.map((v, k) => k === j ? B[i] : v));
+  let peak = null, how = 'courbe';
+  if (Math.abs(dA) > 1e-9) { const b = det(col(1)) / dA, c = det(col(2)) / dA; if (c < -0.5) peak = -b / (2 * c); }
+  if (peak == null || peak < 6.5 || peak > 10) {  // pas de sommet net : moyenne des nuits du meilleur quart de Recovery
+    const top = [...pts].sort((x, y) => y[1] - x[1]).slice(0, Math.max(3, Math.round(n / 4)));
+    peak = mean(top.map(p => p[0])); how = 'meilleures nuits';
+  }
+  const w = Math.min(0.8, 0.3 + (n - 10) / 50);  // la part apprise grandit avec le nombre de nuits
+  return (PN = {min: Math.round(clamp((w * peak + (1 - w) * NEED / 60) * 60, 390, 600)), n, learned: true, peak, w, how});
+}
+function idealCard() {
+  const p = personalNeed();
+  return `<div class="card"><h2><span>Ton sommeil idéal</span><span>${p.learned ? `appris sur ${p.n} nuits` : `${p.n}/10 nuits avec Recovery`}</span></h2>
+    <div class="big" style="font-size:34px;text-align:left">${hm(p.min)}</div>
+    <p class="desc" style="margin-top:6px">${p.learned
+      ? `Tes meilleures Recovery arrivent après environ <b>${hm(p.peak * 60)}</b> de sommeil (${p.how === 'courbe' ? 'sommet de la courbe Recovery / durée' : 'moyenne de tes nuits les plus récupératrices'}). Ton besoin de base mélange ce résultat (${Math.round(p.w * 100)} %) et ton réglage de profil ; la part apprise augmente avec les nuits.`
+      : `Pour l’instant, c’est ton réglage de profil (${hm(NEED)}). Dès 10 nuits avec une Recovery, l’appli calcule la durée de sommeil qui te réussit le mieux, puis l’affine chaque nuit.`}
+      Chaque soir, le besoin est réajusté : effort du jour, dette, siestes, et ce que tu notes dans le journal (alcool +20 min, soirée +15 min, malade +30 min, journée stressante +10 min).</p></div>`;
+}
+const JNEED = {alcool: 20, soiree: 15, malade: 30, stress: 10};  // minutes de récupération en plus la nuit suivante
+function needAfter(i) {  // besoin de sommeil pour la nuit qui suit le jour i : base perso + effort + dette + journal - siestes
+  const base = personalNeed().min, d = D.days[i];
+  if (!d) return {base, strain: 0, debt: 0, naps: 0, journal: 0, jtxt: [], total: base};
   const strain = d.strain > 10 ? Math.min(60, (d.strain - 10) * 4) : 0;
   const nights = D.days.slice(Math.max(0, i - 2), i + 1).map(x => nightOf(x.date)).filter(Boolean);
-  const debt = Math.min(60, sum(nights.map(x => Math.max(0, NEED - x.asleep))) / 3);
+  const debt = Math.min(60, sum(nights.map(x => Math.max(0, base - x.asleep))) / 3);
   const naps = sum(D.sleeps.filter(s => s.type === 'Sieste' && s.date === d.date).map(s => s.asleep));
-  return {base: NEED, strain, debt, naps, total: Math.round(Math.max(NEED * 0.8, NEED + strain + debt - naps))};
+  const j = (JOURNAL[d.date] || []).filter(k => JNEED[k]), journal = Math.min(45, sum(j.map(k => JNEED[k])));
+  const jtxt = j.map(k => JITEMS.find(x => x[0] === k)[2].toLowerCase());
+  return {base, strain, debt, naps, journal, jtxt, total: Math.round(Math.max(base * 0.8, base + strain + debt + journal - naps))};
 }
 const needFor = idx => needAfter(idx - 1);
 const NSET = new Map();
@@ -513,10 +549,11 @@ function sleepWeek(idx) {
   const nights = D.days.slice(Math.max(0, idx - 6), idx + 1).map(x => nightOf(x.date)).filter(Boolean);
   const tod = iso => { const t = new Date(iso); let m = t.getHours() * 60 + t.getMinutes(); return m < 720 ? m + 1440 : m; };
   const debt = sum(nights.map(x => Math.max(0, NEED - x.asleep)));
-  const wake = median(nights.map(x => tod(x.end))), awake = mean(nights.map(x => x.inbed - x.asleep)) || 15;
+  const wake = median(nights.map(x => tod(x.end))), bed = median(nights.map(x => tod(x.start))), awake = mean(nights.map(x => x.inbed - x.asleep)) || 15;
   const tonightNeed = needAfter(idx).total;
   return {nights, debt, avg: mean(nights.map(x => x.asleep)), regBed: sd(nights.map(x => tod(x.start))), regWake: sd(nights.map(x => tod(x.end))),
-    wake, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed};
+    wake, bed, bedtime: wake == null ? null : wake - tonightNeed - awake, tonightNeed,
+    wakeIfUsualBed: bed == null ? null : bed + tonightNeed + awake};  // réveil conseillé si tu te couches à ton heure habituelle
 }
 const STAGE = {W: ['Éveil', '--line'], R: ['Paradoxal (REM)', '--violet'], L: ['Léger', '--z2'], D: ['Profond', '#2c3e9e']};
 const stageColor = k => STAGE[k][1].startsWith('--') ? css(STAGE[k][1]) : STAGE[k][1];
@@ -571,6 +608,7 @@ function viewDay(idx) {
     <a class="ring" href="#/sommeil/${d.date}">${ring(Math.min(sleepPct || 0, 100) / 100, css('--violet'), sleepPct == null ? '—' : sleepPct + ' %', d.sleep == null ? '' : hm(d.sleep))}<div class="lbl">Sommeil</div><div class="sub">${d.sleep == null ? 'pas de nuit' : 'performance'}</div>${qualLine('sleepH', idx)}</a>
   </div>
   ${ins.out.length ? `<div class="card"><h2><span>Bilan du jour</span></h2>${ins.out.map(i => `<div class="insight"><span class="ic" style="background:${i.color}">${i.icon}</span><div>${i.text}</div></div>`).join('')}</div>` : ''}
+  ${idx === D.days.length - 1 ? (w => alarmCard(w.wakeIfUsualBed != null ? hhmm(w.wakeIfUsualBed) : null))(sleepWeek(idx)) : ''}
   ${(a => a ? `<a class="card" href="#/age"><h2><span>Âge physiologique ›</span><span>${a.days < 30 ? 'provisoire' : '30 derniers jours'}</span></h2>
     <div style="display:flex;align-items:baseline;gap:10px"><span class="big" style="font-size:34px">${fmt(a.bio, 1)}</span><span class="delta ${a.diff < 0 ? 'good' : a.diff > 0 ? 'bad' : ''}">ans · ${a.diff < 0 ? fmt(-a.diff, 1) + ' ans de moins' : a.diff > 0 ? fmt(a.diff, 1) + ' ans de plus' : 'égal'} que ton âge réel (${a.real})</span></div></a>` : '')(bioAge())}
   <div class="grid">${['hrv', 'rhr', 'stress', 'resp', 'spo2', 'temp', 'vo2', 'steps'].map(k => tile(k, idx)).join('')}</div>
@@ -656,9 +694,10 @@ function viewSleep(idx) {
   const d = D.days[idx], n = nightOf(d.date), w = sleepWeek(idx);
   const plan = idx === D.days.length - 1 && w.bedtime != null ? `<div class="card"><h2><span>Ce soir</span></h2><div class="stats" style="margin:0">
     ${statBox('Coucher conseillé', hhmm(w.bedtime))}${statBox('Lever habituel', hhmm(w.wake))}${statBox('Sommeil visé', hm(w.tonightNeed))}</div>
-    <p class="desc">Ton besoin de cette nuit (base ${hm(NEED)} + effort du jour + dette − siestes), plus le temps que tu passes éveillé au lit.</p></div>` : '';
-  if (!n) return navDate('sommeil', idx) + `<div class="card empty">Pas de nuit enregistrée pour ce jour.</div>${plan}
-    <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin'})}</div>`;
+    <p class="desc">Ton besoin de cette nuit (base ${hm(personalNeed().min)} + effort du jour + dette + journal − siestes), plus le temps que tu passes éveillé au lit.</p></div>
+    ${alarmCard(w.wakeIfUsualBed != null ? hhmm(w.wakeIfUsualBed) : null)}` : '';
+  if (!n) return navDate('sommeil', idx) + `<div class="card empty">Pas de nuit enregistrée pour ce jour.</div>${plan}${idealCard()}
+    <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: personalNeed().min / 60, refLabel: 'besoin'})}</div>`;
   const need = needFor(idx), pct = Math.round(n.asleep / need.total * 100), a = epochMin(n.start), cons = consistency(idx);
   const pts = hrBetween(a, epochMin(n.end)), asl = n.asleep || 1, rest = (n.deep || 0) + (n.rem || 0), wakeMin = n.inbed - n.asleep;
   const stRow = (k, min, ref) => `<div class="zrow"><div style="display:flex;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:${stageColor(k)}"></i>${STAGE[k][0].split(' ')[0]}</div>
@@ -677,16 +716,18 @@ function viewSleep(idx) {
     <div class="q">Fiabilité : ${['hrv', 'rhr', 'resp', 'temp'].map(k => { const q = quality(k, idx); return q ? `${M[k].name} ${QTXT[q.s]}` : ''; }).filter(Boolean).join(' · ')}
       · ${Math.round((n.cover ?? 1) * 100)} % de la nuit mesurée · ${fmt(n.beats ?? 0)} battements valides</div></div>
   <div class="card"><h2><span>Ton besoin de sommeil cette nuit</span><span>${hm(need.total)}</span></h2>
-    <div class="cmp"><div>Besoin de base</div><div class="v">${hm(need.base)}</div><div></div></div>
+    <div class="cmp"><div>Besoin de base ${personalNeed().learned ? '(appris sur tes nuits)' : '(profil)'}</div><div class="v">${hm(need.base)}</div><div></div></div>
     <div class="cmp"><div>Effort de la veille (strain)</div><div class="v">+ ${hm(need.strain)}</div><div></div></div>
     <div class="cmp"><div>Dette des 3 dernières nuits</div><div class="v">+ ${hm(need.debt)}</div><div></div></div>
+    <div class="cmp"><div>Journal de la veille${need.jtxt.length ? ' (' + need.jtxt.join(', ') + ')' : ''}</div><div class="v">+ ${hm(need.journal)}</div><div></div></div>
     <div class="cmp"><div>Siestes de la veille</div><div class="v">− ${hm(need.naps)}</div><div></div></div></div>
+  ${idealCard()}
   <div class="card"><h2><span>Fréquence cardiaque pendant la nuit</span></h2>${hrStats(pts)}${hrChart(pts, {xTicks: rangeTicks(pts), smoothWin: 3})}</div>
   ${plan}
   <div class="card"><h2><span>7 derniers jours</span></h2><div class="stats" style="margin:0">
     ${statBox('Dette de sommeil', hm(w.debt))}${statBox('Moyenne', hm(w.avg))}
     ${statBox('Régularité coucher', w.regBed == null ? '—' : '± ' + fmt(w.regBed), 'min')}${statBox('Régularité lever', w.regWake == null ? '—' : '± ' + fmt(w.regWake), 'min')}</div></div>
-  <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: NEED / 60, refLabel: 'besoin de base'})}</div>
+  <div class="card"><h2><span>Sommeil · 30 jours</span></h2>${dailyChart('sleepH', idx, 30, {ref: personalNeed().min / 60, refLabel: 'besoin de base'})}</div>
   <p class="desc" style="text-align:center">Détection : ${n.source.toLowerCase()}.</p>`;
 }
 let period = 30;
@@ -717,7 +758,8 @@ function viewAct(i) {
 // ---------- journal (habitudes notées chaque jour -> effet mesuré sur la Recovery du lendemain)
 const JITEMS = [['alcool', '🍷', 'Alcool'], ['cafeine', '☕', 'Caféine après 14 h'], ['repas', '🍽️', 'Repas tardif'], ['ecrans', '📱', 'Écrans au lit'],
   ['muscu', '🏋️', 'Musculation'], ['etirements', '🧘', 'Étirements / yoga'], ['meditation', '🌿', 'Méditation / respiration'],
-  ['lumiere', '☀️', 'Lumière du jour le matin'], ['stress', '⚡', 'Journée stressante'], ['malade', '🤒', 'Malade / fatigué'], ['rien', '✓', 'Rien de tout ça']];
+  ['lumiere', '☀️', 'Lumière du jour le matin'], ['soiree', '🎉', 'Soirée / couché tard'], ['stress', '⚡', 'Journée stressante'],
+  ['malade', '🤒', 'Malade / fatigué'], ['rien', '✓', 'Rien de tout ça']];
 let JOURNAL = window.D_JOURNAL || (() => { try { return JSON.parse(localStorage.getItem('whoop_journal') || '{}'); } catch (e) { return {}; } })();
 function storeJournal() { if (window.WHOOP_SAVE_JOURNAL) window.WHOOP_SAVE_JOURNAL(JOURNAL); else try { localStorage.setItem('whoop_journal', JSON.stringify(JOURNAL)); } catch (e) {} }
 function toggleJ(date, k, el) {
@@ -726,6 +768,37 @@ function toggleJ(date, k, el) {
   if (k === 'rien' && a.has('rien')) { a.clear(); a.add('rien'); }
   JOURNAL[date] = [...a]; storeJournal();
   el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', a.has(c.dataset.k)));
+}
+
+// ---------- réveil WHOOP (seulement dans l'appli iPhone, qui parle au bracelet)
+function alarmCard(suggest) {
+  if (!window.WHOOP_ALARM) return '';
+  const al = window.D_ALARM || {on: false, repeat: true, time: suggest || '07:00'};
+  const active = al.on && (al.repeat || (al.ts && al.ts * 1000 > Date.now())), when = al.ts ? new Date(al.ts * 1000) : null;
+  return `<div class="card"><h2><span>⏰ Réveil WHOOP</span><span>le bracelet vibre</span></h2>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <input id="alt" type="time" value="${al.time || suggest || '07:00'}" style="font:inherit;font-size:30px;font-weight:650;padding:4px 10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg)">
+      <label class="sw"><input id="alon" type="checkbox" ${active ? 'checked' : ''} onchange="alarmSet()"><span></span></label>
+      <span class="delta">${active ? `activé${when ? ' · ' + when.toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'}) : ''}` : 'désactivé'}</span></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input id="alrep" type="checkbox" ${al.repeat !== false ? 'checked' : ''}> Répéter chaque jour (reprogrammé à chaque synchro)</label>
+    ${suggest ? `<p class="desc" style="margin-top:8px">Pour dormir ton besoin en te couchant à ton heure habituelle : réveil vers <b>${suggest}</b>
+      · <a href="javascript:void 0" style="text-decoration:underline" onclick="document.getElementById('alt').value='${suggest}'">utiliser cette heure</a></p>` : ''}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn2" onclick="alarmSet(true)">Enregistrer l’heure</button><button class="btn2" onclick="alarmTest()">Tester la vibration</button></div></div>`;
+}
+async function alarmSet(save) {
+  const box = document.getElementById('alon'), on = save ? true : box.checked;
+  if (window.__syncing) { sheet('Réveil', ['Attends la fin de la synchro puis réessaie.']); box.checked = !box.checked; return setTimeout(() => sheet('', [], false), 3000); }
+  try {
+    sheet('Réveil', ['Connexion au bracelet…']);
+    window.D_ALARM = await window.WHOOP_ALARM(on ? 'set' : 'off', {time: document.getElementById('alt').value, repeat: document.getElementById('alrep').checked});
+    sheet(on ? 'Réveil activé ✓' : 'Réveil désactivé ✓', [on ? 'le bracelet vibrera ' + new Date(window.D_ALARM.ts * 1000).toLocaleString('fr-FR', {weekday: 'long', hour: '2-digit', minute: '2-digit'}) : 'plus aucune vibration programmée']);
+    setTimeout(() => { sheet('', [], false); route(); }, 2500);
+  } catch (e) { box.checked = !on; sheet('Réveil impossible', [e.message]); setTimeout(() => sheet('', [], false), 6000); }
+}
+async function alarmTest() {
+  try { sheet('Réveil', ['Connexion au bracelet…']); await window.WHOOP_ALARM('test'); sheet('Vibration envoyée ✓', ['Le bracelet a dû vibrer.']); }
+  catch (e) { sheet('Test impossible', [e.message]); }
+  setTimeout(() => sheet('', [], false), 4000);
 }
 const journalCard = date => `<div class="card"><h2><span>Journal du jour</span><span>coche ce que tu as fait ce jour-là</span></h2><div class="chips">
   ${JITEMS.map(([k, ic, l]) => `<span class="chip ${(JOURNAL[date] || []).includes(k) ? 'on' : ''}" data-k="${k}" onclick="toggleJ('${date}','${k}',this)">${ic} ${l}</span>`).join('')}</div>
@@ -912,7 +985,7 @@ function viewTrends() {
   const idx = D.days.length - 1, seg = [7, 30, 90].map(p => `<a href="#/tendances/${p}" class="${p === period ? 'on' : ''}">${p} jours</a>`).join('');
   const card = key => { const m = M[key], st = stats(key, idx, period);
     return `<a class="card" href="#/m/${key}/${LAST}/${period}"><h2><span>${m.name} ›</span><span>${st ? `moy. <b>${fmt(st.avg, m.dig)}</b> ${m.unit} · ${fmt(st.min.y, m.dig)}–${fmt(st.max.y, m.dig)}` : ''}</span></h2>
-      ${dailyChart(key, idx, period, {h: 140, ...(key === 'sleepH' ? {ref: NEED / 60, refLabel: 'besoin'} : {})})}</a>`; };
+      ${dailyChart(key, idx, period, {h: 140, ...(key === 'sleepH' ? {ref: personalNeed().min / 60, refLabel: 'besoin'} : {})})}</a>`; };
   const ag = bioAge();
   return `<div class="title"><h1>Tendances</h1></div>
   ${ag ? `<a class="card" href="#/age"><h2><span>Healthspan ›</span><span>âge réel ${ag.real} ans</span></h2><div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
@@ -990,7 +1063,7 @@ document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new D
   + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
 route();
 </script>
-<script>window.WHOOP_VERSION='30/10/2026 08:27'</script>
+<script>window.WHOOP_VERSION='30/10/2026 10:28'</script>
 <script>
 // iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
 // Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
@@ -1002,7 +1075,12 @@ const NOTIF = ['fd4b0003-cce1-4033-93ce-002d5875f58a', 'fd4b0004-cce1-4033-93ce-
   'fd4b0005-cce1-4033-93ce-002d5875f58a', 'fd4b0007-cce1-4033-93ce-002d5875f58a'];
 const PT_COMMAND = 35, PT_HISTORICAL = 47, PT_METADATA = 49;
 const LINK_VALID = 1, ABORT_HISTORICAL = 20, SEND_HISTORICAL = 22, HISTORICAL_RESULT = 23, GET_HELLO = 145,
-  ENTER_HF = 96, EXIT_HF = 97;
+  ENTER_HF = 96, EXIT_HF = 97, SET_ALARM = 66, DISABLE_ALARM = 69, HAPTIC = 19;
+// Réveil (format décodé de l'appli officielle par whoop-vault, alarms.py / commands.py) :
+// SET_ALARM = [révision 4, emplacement, heure unix u32, millis u16, motif de vibration 12 octets]
+const ALARM_HAPTIC = [49, 49, 49, 49, 49, 49, 49, 49, 1, 0, 1, 30];   // 8 vibrations fortes, 30 s
+const TEST_HAPTIC = [1, 49, 49, 49, 49, 49, 49, 49, 49, 2, 0, 1];     // vibration immédiate (bouton test)
+const alarmPayload = ts => [4, 0, ts & 255, (ts >>> 8) & 255, (ts >>> 16) & 255, ts >>> 24, 0, 0, ...ALARM_HAPTIC];
 
 // ---------------------------------------------------------------- trames (protocole Maverick)
 const CRC16 = [], CRC32 = [];
@@ -1302,7 +1380,7 @@ async function persist(map, state) {  // minutes + état écrits dans UNE seule 
     t.oncomplete = res; t.onerror = () => rej(t.error);
   });
 }
-async function syncBracelet(log, auto = false) {
+async function connectWhoop(log, auto = false) {
   if (!navigator.bluetooth) throw new Error('Bluetooth indisponible : ouvre cette page dans l’app Bluefy.');
   let device = await rememberedWhoop(), server = null;
   if (device) {
@@ -1318,6 +1396,37 @@ async function syncBracelet(log, auto = false) {
   let battery = null;
   try { battery = (await (await (await server.getPrimaryService('battery_service')).getCharacteristic('battery_level')).readValue()).getUint8(0); } catch (e) {}
   const svc = await server.getPrimaryService(SVC), cmd = await svc.getCharacteristic(CMD);
+  return {server, svc, cmd, battery};
+}
+
+// ---------------------------------------------------------------- réveil du bracelet
+const nextAt = hhmm => {  // prochaine occurrence de l'heure HH:MM (aujourd'hui ou demain)
+  const [h, m] = hhmm.split(':').map(Number), t = new Date(); t.setHours(h, m, 0, 0);
+  if (t.getTime() <= Date.now() + 60000) t.setDate(t.getDate() + 1);
+  return Math.floor(t.getTime() / 1000);
+};
+async function alarmCommand(action, opts = {}, log = () => {}) {
+  const {server, cmd} = await connectWhoop(log);
+  const send = async (c, p) => { const b = encodeCmd(c, p); cmd.writeValueWithResponse ? await cmd.writeValueWithResponse(b) : await cmd.writeValue(b); };
+  const al = Object.assign({on: false, time: '07:00', repeat: true, ts: null}, await kvGet('alarm'));
+  try {
+    if (action === 'set') { al.time = opts.time; al.repeat = !!opts.repeat; al.ts = nextAt(opts.time); al.on = true; await send(SET_ALARM, alarmPayload(al.ts)); }
+    if (action === 'off') { al.on = false; al.ts = null; await send(DISABLE_ALARM, [2, 0xFF]); }
+    if (action === 'test') await send(HAPTIC, TEST_HAPTIC);
+    await new Promise(r => setTimeout(r, 2500));  // le bracelet exécute la commande avant la déconnexion
+  } finally { try { server.disconnect(); } catch (e) {} }
+  if (action !== 'test') await kvSet('alarm', al);
+  return al;
+}
+async function maintainAlarm(send) {  // réveil répété : reprogrammé pour le lendemain à chaque synchro
+  const al = await kvGet('alarm');
+  if (!al || !al.on || !al.repeat || (al.ts && al.ts > Date.now() / 1000 + 60)) return;
+  al.ts = nextAt(al.time); await send(SET_ALARM, alarmPayload(al.ts)); await kvSet('alarm', al);
+  await new Promise(r => setTimeout(r, 2000));
+}
+
+async function syncBracelet(log, auto = false) {
+  const {server, svc, cmd, battery} = await connectWhoop(log, auto);
   const state = await getState(), map = new Map(), pending = [], acks = [];
   let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0}, wake = null;
   let firstTs = null, lastRecTs = null, recs = 0;
@@ -1370,6 +1479,7 @@ async function syncBracelet(log, auto = false) {
   } finally {
     await flush();
     for (const c of [ABORT_HISTORICAL, EXIT_HF]) { try { await send(c); } catch (e) {} }
+    try { await maintainAlarm(send); } catch (e) {}
     dropped = asm.reduce((s, a) => s + a.dropped, 0);
     state.syncs.push({date: isoLocal(Date.now()), recus: chunks, nouveaux: stats.added, doublons: stats.dup, trous: stats.gaps,
       complet: complete, rejetes: dropped, battery});
@@ -1550,6 +1660,8 @@ async function start() {
   window.D_DATA = compute(raw, state, profil);
   window.D_JOURNAL = (await kvGet('journal')) || {};
   window.WHOOP_SAVE_JOURNAL = j => kvSet('journal', j);  // sauvegardé sur GitHub à la prochaine synchro (etat.json)
+  window.D_ALARM = (await kvGet('alarm')) || null;
+  window.WHOOP_ALARM = (action, opts) => alarmCommand(action, opts, t => window.sheet && window.sheet('Réveil', [t]));
   prune(raw, window.D_DATA.sleeps).catch(() => {});
   window.WHOOP_SERVER = true;  // affiche le bouton ↻ de l'interface
   const ui = document.getElementById('ui'), s = document.createElement('script');
@@ -1578,9 +1690,20 @@ async function start() {
       window.sheet('Synchro impossible', [e.message]); setTimeout(() => window.sheet('', [], false), 8000);
     }
   };
-  // Synchro automatique à l'ouverture si la dernière date de plus d'une heure et que le bracelet est mémorisé
+  // Synchro automatique : une fois à l'ouverture de l'appli, puis seulement si on y revient après 20 min d'absence.
+  // (pas de boucle : le rechargement qui suit une synchro ne relance rien, et rien si la dernière synchro a < 10 min)
   const lastSync = state.syncs.length ? new Date(state.syncs[state.syncs.length - 1].date).getTime() : 0;
-  if (raw.length && navigator.bluetooth && Date.now() - lastSync > 3600e3) rememberedWhoop().then(d => d && window.startSync(true));
+  if (raw.length && navigator.bluetooth && Date.now() - lastSync > 10 * 60000) {
+    rememberedWhoop().then(d => {
+      if (d) window.startSync(true);
+      else { window.sheet('Touche ↻ pour synchroniser', ['Bluefy ne permet pas la synchro automatique sur ce téléphone.']); setTimeout(() => window.sheet('', [], false), 4000); }
+    });
+  }
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) hiddenAt = Date.now();
+    else if (hiddenAt && Date.now() - hiddenAt > 20 * 60000) location.reload();  // retour après 20 min : données fraîches + synchro
+  });
   const foot = document.getElementById('foot'), a = document.createElement('a');
   a.textContent = 'Réglages · sauvegarde · import'; a.href = 'javascript:void 0'; a.style.cssText = 'display:inline-block;margin-top:10px;text-decoration:underline';
   a.onclick = settings; foot.appendChild(document.createElement('br')); foot.appendChild(a);
