@@ -1076,7 +1076,7 @@ document.getElementById('foot').innerHTML = (s.last ? `Dernière synchro ${new D
   + (nextSync ? `<br>Prochaine synchro au plus tard le ${nextSync.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})} (mémoire du bracelet ≈ 14 jours)` : '');
 route();
 </script>
-<script>window.WHOOP_VERSION='30/10/2026 10:42'</script>
+<script>window.WHOOP_VERSION='10/11/2026 08:39'</script>
 <script>
 // iphone_moteur.js - Version 100 % iPhone de l'appli WHOOP (navigateur Bluefy, Web Bluetooth).
 // Connexion directe au bracelet, téléchargement de sa mémoire, stockage dans le téléphone (IndexedDB)
@@ -1088,7 +1088,7 @@ const NOTIF = ['fd4b0003-cce1-4033-93ce-002d5875f58a', 'fd4b0004-cce1-4033-93ce-
   'fd4b0005-cce1-4033-93ce-002d5875f58a', 'fd4b0007-cce1-4033-93ce-002d5875f58a'];
 const PT_COMMAND = 35, PT_HISTORICAL = 47, PT_METADATA = 49;
 const LINK_VALID = 1, ABORT_HISTORICAL = 20, SEND_HISTORICAL = 22, HISTORICAL_RESULT = 23, GET_HELLO = 145,
-  ENTER_HF = 96, EXIT_HF = 97, SET_ALARM = 66, DISABLE_ALARM = 69, HAPTIC = 19;
+  ENTER_HF = 96, EXIT_HF = 97, SET_ALARM = 66, DISABLE_ALARM = 69, HAPTIC = 19, SET_CLOCK = 10;
 // Réveil (format décodé de l'appli officielle par whoop-vault, alarms.py / commands.py) :
 // SET_ALARM = [révision 4, emplacement, heure unix u32, millis u16, motif de vibration 12 octets]
 const ALARM_HAPTIC = [49, 49, 49, 49, 49, 49, 49, 49, 1, 0, 1, 30];   // 8 vibrations fortes, 30 s
@@ -1176,12 +1176,18 @@ const DEFAULT_STATE = {maxRid: null, lastSteps: null, lastTs: null, measures: 0,
 async function getState() { return Object.assign({}, DEFAULT_STATE, await kvGet('state') || {}); }
 
 // Ajoute des secondes décodées : contrôle de la numérotation (trous), doublons ignorés, agrégation par minute
+const MIN_TS = 1735689600;  // 01/01/2025 : avant, l'horloge du bracelet n'est pas à l'heure (batterie vidée)
 function ingest(recs, state, map) {
-  let dup = 0, gaps = 0, added = 0;
-  recs.sort((a, b) => a.rid - b.rid);
+  let dup = 0, gaps = 0, added = 0, invalid = 0, resets = 0;
+  const maxTs = Date.now() / 1000 + 86400;
+  recs.sort((a, b) => a.ts - b.ts || a.rid - b.rid);  // ordre chronologique
   for (const r of recs) {
-    if (state.maxRid != null && r.rid <= state.maxRid) { dup++; continue; }
-    if (state.maxRid != null && r.rid > state.maxRid + 1) gaps += r.rid - state.maxRid - 1;
+    if (r.ts < MIN_TS || r.ts > maxTs) { invalid++; continue; }  // date impossible : on ne la place pas au hasard
+    // Doublon = mesure déjà reçue (même heure ou plus ancienne). On ne se fie plus seulement au numéro :
+    // après une batterie vide, le bracelet redémarre et renumérote ses mesures à partir de zéro.
+    if (state.lastTs != null && r.ts <= state.lastTs + 0.2) { dup++; continue; }
+    if (state.maxRid != null && r.rid <= state.maxRid) resets++;  // numérotation repartie de zéro : pas un trou
+    else if (state.maxRid != null && r.rid > state.maxRid + 1) gaps += r.rid - state.maxRid - 1;
     state.maxRid = r.rid; state.measures++; added++;
     const t = Math.floor(r.ts / 60);
     let m = map.get(t); if (!m) map.set(t, m = newMin(t));
@@ -1199,7 +1205,7 @@ function ingest(recs, state, map) {
     state.lastSteps = r.steps; state.lastTs = r.ts;
   }
   state.gaps += gaps;
-  return {dup, gaps, added};
+  return {dup, gaps, added, invalid, resets};
 }
 
 // ---------------------------------------------------------------- calculs (identiques à whoop_analyse.py)
@@ -1463,7 +1469,7 @@ async function maintainAlarm(send) {  // à chaque synchro : réveil répété r
 async function syncBracelet(log, auto = false) {
   const {server, svc, cmd, battery} = await connectWhoop(log, auto);
   const state = await getState(), map = new Map(), pending = [], acks = [];
-  let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0}, wake = null;
+  let complete = false, last = Date.now(), chunks = 0, dropped = 0, stats = {dup: 0, gaps: 0, added: 0, invalid: 0, resets: 0}, wake = null;
   let firstTs = null, lastRecTs = null, recs = 0, alarmMsg = null;
   const kick = () => { if (wake) { const w = wake; wake = null; w(); } };
   const asm = NOTIF.map(() => new Reassembler());
@@ -1490,7 +1496,7 @@ async function syncBracelet(log, auto = false) {
   const send = async (c, p) => { const b = encodeCmd(c, p); cmd.writeValueWithResponse ? await cmd.writeValueWithResponse(b) : await cmd.writeValue(b); };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const flush = async () => {  // on enregistre dans le téléphone AVANT de confirmer au bracelet
-    if (pending.length) { const s = ingest(pending.splice(0), state, map); stats.dup += s.dup; stats.gaps += s.gaps; stats.added += s.added; }
+    if (pending.length) { const s = ingest(pending.splice(0), state, map); for (const k in s) stats[k] += s[k]; }
     if (map.size) { await persist(map, state); map.clear(); }
   };
   const progress = started => {  // part de la période à rattraper déjà reçue + temps restant estimé
@@ -1501,7 +1507,12 @@ async function syncBracelet(log, auto = false) {
   };
   try {
     log('Lecture de la mémoire du bracelet…');
-    await send(GET_HELLO); await sleep(600); await send(LINK_VALID); await send(ENTER_HF); await sleep(300); await send(SEND_HISTORICAL);
+    await send(GET_HELLO); await sleep(600); await send(LINK_VALID);
+    // Remet l'horloge du bracelet à l'heure (elle peut repartir de zéro après une batterie vide) :
+    // SET_CLOCK = heure unix u32 + fuseau 0 (format whoop-vault, commands.py)
+    const now = Math.floor(Date.now() / 1000);
+    try { await send(SET_CLOCK, [now & 255, (now >>> 8) & 255, (now >>> 16) & 255, now >>> 24, 0]); } catch (e) {}
+    await send(ENTER_HF); await sleep(300); await send(SEND_HISTORICAL);
     last = Date.now(); const started = Date.now(); let keep = Date.now(), shown = 0;
     while (!complete) {
       if (acks.length) {
@@ -1516,7 +1527,7 @@ async function syncBracelet(log, auto = false) {
     for (const c of [ABORT_HISTORICAL, EXIT_HF]) { try { await send(c); } catch (e) {} }
     try { alarmMsg = await maintainAlarm(send); } catch (e) {}
     dropped = asm.reduce((s, a) => s + a.dropped, 0);
-    state.syncs.push({date: isoLocal(Date.now()), recus: chunks, nouveaux: stats.added, doublons: stats.dup, trous: stats.gaps,
+    state.syncs.push({date: isoLocal(Date.now()), recus: chunks, nouveaux: stats.added, doublons: stats.dup, trous: stats.gaps, redemarrages: stats.resets, dates_invalides: stats.invalid,
       complet: complete, rejetes: dropped, battery});
     state.syncs = state.syncs.slice(-200);
     await kvSet('state', state);
@@ -1710,7 +1721,11 @@ async function start() {
     try {
       const r = await syncBracelet(t => window.sheet(auto ? 'Synchro automatique…' : 'Synchronisation du bracelet…', [t, keepNote]), auto);
       try { lock && lock.release(); } catch (e) {}
-      const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}`, ...(r.alarmMsg ? ['⏰ ' + r.alarmMsg] : [])];
+      const lines = [`${r.added} nouvelles mesures · ${r.gaps ? r.gaps + ' manquantes' : 'aucune perte'}${r.battery != null ? ' · batterie ' + r.battery + ' %' : ''}`,
+        ...(r.resets ? ['bracelet redémarré (batterie vidée ?) : numérotation reprise, rien de perdu'] : []),
+        ...(r.invalid ? [`${r.invalid} mesures ignorées : horloge du bracelet pas à l’heure (corrigée pour la suite)`] : []),
+        ...(!r.added && !r.dup && !r.invalid ? ['le bracelet n’avait rien de nouveau en mémoire'] : []),
+        ...(r.alarmMsg ? ['⏰ ' + r.alarmMsg] : [])];
       window.sheet(r.complete ? 'Synchro terminée ✓' : 'Synchro partielle', lines);
       try {
         const b = await backupGitHub(t => window.sheet('Sauvegarde automatique…', [t]));
@@ -1722,7 +1737,11 @@ async function start() {
       try { lock && lock.release(); } catch (err) {}
       window.__syncing = false; document.querySelector('.syncb') && document.querySelector('.syncb').classList.remove('spin');
       if (auto) { window.sheet('', [], false); return; }  // synchro auto ratée (bracelet loin) : on ne dérange pas
-      window.sheet('Synchro impossible', [e.message]); setTimeout(() => window.sheet('', [], false), 8000);
+      const m = String(e && e.message || e);
+      const hint = /cancel|annul|no device|aucun/i.test(m) ? 'Aucun WHOOP choisi. S’il n’apparaît pas dans la liste : recharge-le (au moins 10 min), approche-le du téléphone et vérifie que le Bluetooth est activé.'
+        : /refuse|auth|secur|insufficient|encrypt/i.test(m) ? 'Le bracelet a oublié l’appairage : Réglages iPhone > Bluetooth > WHOOP (i) > Oublier cet appareil, puis mets le bracelet en mode bleu et réessaie.'
+        : /portée|timeout|time out|connect|disconnect|gatt|network/i.test(m) ? 'Connexion perdue : garde le bracelet tout près du téléphone, chargé, et réessaie.' : '';
+      window.sheet('Synchro impossible', [m, hint].filter(Boolean)); setTimeout(() => window.sheet('', [], false), 15000);
     }
   };
   // Synchro automatique : une fois à l'ouverture de l'appli, puis seulement si on y revient après 20 min d'absence.
